@@ -1,0 +1,10 @@
+{
+  "name": "Fidélité Bouquinerie Thot",
+  "short_name": "Thot Fidélité",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FAF6F0",
+  "theme_color": "#2D4F3E",
+  "icons": [{ "src": "./logo.png", "sizes": "512x512", "type": "image/png" }]
+}
