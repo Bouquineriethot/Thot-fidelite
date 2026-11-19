@@ -67,8 +67,7 @@
     }
     window.installApp = async () => {
       if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; }
-      alert("Pour installer l'application :\n\n• Sur Android (Chrome) : appuyez sur les 3 points ⋮ en haut à droite puis « Ajouter à l'écran d'accueil ».\n\n• Sur iPhone (Safari) : appuyez sur le bouton Partager en bas puis « Sur l'écran d'accueil ».");
-    };
+alert("Pour installer l'application :\n\n• Sur Android (Chrome) : appuyez sur les 3 points ⋮ en haut à droite, puis « Installer et créer un raccourci » (ou « Ajouter à l'écran d'accueil »).\n\n• Sur iPhone (Safari) : appuyez sur le bouton Partager (carré avec une flèche vers le haut) en bas, puis « Sur l'écran d'accueil ».");    };
     window.setTab = (t) => { state.authTab = t; state.showSecret = false; state.err = null; state.msg = null; render(); };
     window.toggleShow = () => { const s = document.getElementById("login-secret")?.value || "", e = document.getElementById("login-email")?.value || "", n = document.getElementById("login-name")?.value || ""; state.showSecret = !state.showSecret; render(); if (document.getElementById("login-email")) document.getElementById("login-email").value = e; if (document.getElementById("login-secret")) document.getElementById("login-secret").value = s; if (document.getElementById("login-name")) document.getElementById("login-name").value = n; };
     window.submitAuth = async (e) => {
