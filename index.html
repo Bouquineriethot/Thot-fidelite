@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <meta name="theme-color" content="#2D4F3E" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <title>Fidélité — Bouquinerie Thot</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config={theme:{extend:{colors:{thot:{cream:"#FAF6F0",forest:"#2D4F3E",gold:"#B8860B",ink:"#1F2933"}}}}};</script>
@@ -17,7 +18,11 @@
   <script>
     const sb = window.supabase.createClient("https://obokcfdxraixkzekgjum.supabase.co", "sb_publishable_hN4pQyzif0bM0jjIw0HGZg_OjOeTb8l", { auth: { persistSession: true } });
     const appEl = document.getElementById("app");
-    let state = { customer: null, staffMode: true, authTab: "login", showSecret: false, msg: null, err: null, selected: null, searchQuery: "", qrScanner: null, scanning: false, rewards: [], vouchers: [] };
+    let state = { customer: null, staffMode: true, authTab: "login", showSecret: false, msg: null, err: null, selected: null, searchQuery: "", qrScanner: null, scanning: false, rewards: [], vouchers: [], activeCount: 0 };
+    window.deferredPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.deferredPrompt = e; });
+    navigator.serviceWorker?.register("./sw.js").catch(() => {});
+
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const qrSvg = (t, px = 86) => { const q = window.qrcode(0, "M"); q.addData(t); q.make(); return q.createSvgTag({ scalable: true }).replace("<svg ", `<svg style="width:${px}px;height:${px}px" `); };
 
@@ -31,9 +36,11 @@
     }
     const headerHtml = () => {
       const c = state.customer;
-      return `<header class="mb-6 flex items-center justify-between"><div class="flex items-center gap-2.5"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-thot-forest text-white font-serif font-bold text-lg">T</div><div><h1 class="font-serif text-lg font-bold leading-tight">Bouquinerie Thot</h1><p class="text-xs text-gray-500">Fidélité • Bollezeele</p></div></div>${c ? `<div class="flex items-center gap-2">${c.role === "staff" ? `<button onclick="toggleMode()" class="rounded-lg border border-thot-forest px-2.5 py-1 text-xs font-bold text-thot-forest">${state.staffMode ? "Vue Client" : "Vue Caisse"}</button>` : ""}<button onclick="logout()" class="rounded-lg border border-stone-300 px-2.5 py-1 text-xs text-gray-600">Quitter</button></div>` : ""}</header>`;
+      const bulle = c?.role === "staff" && state.activeCount > 0 ? `<span class="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">${state.activeCount}</span>` : "";
+      return `<header class="mb-6 flex items-center justify-between"><div class="flex items-center gap-2.5"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-thot-forest text-white font-serif font-bold text-lg">T</div><div><h1 class="font-serif text-lg font-bold leading-tight">Bouquinerie Thot</h1><p class="text-xs text-gray-500">Fidélité • Bollezeele</p></div></div>${c ? `<div class="flex items-center gap-2">${c.role === "staff" ? `<button onclick="toggleMode()" class="flex items-center rounded-lg border border-thot-forest px-2.5 py-1 text-xs font-bold text-thot-forest">${state.staffMode ? "Vue Client" : "Vue Caisse"}${bulle}</button>` : ""}<button onclick="logout()" class="rounded-lg border border-stone-300 px-2.5 py-1 text-xs text-gray-600">Quitter</button></div>` : ""}</header>`;
     };
     const flashHtml = () => (state.msg ? `<div class="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">${esc(state.msg)}</div>` : "") + (state.err ? `<div class="mb-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">${esc(state.err)}</div>` : "");
+    const rgpdHtml = `<p class="mt-4 rounded-xl bg-stone-50 p-3 text-[11px] leading-snug text-gray-500">Vos coordonnées servent uniquement au programme fidélité de la Bouquinerie Thot et ne sont jamais partagées. Suppression possible sur simple demande.</p>`;
 
     function renderLogin() {
       const t = state.authTab;
@@ -42,7 +49,7 @@
         return;
       }
       const up = t === "signup";
-      appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"><div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-100 p-1 mb-5"><button type="button" onclick="setTab('login')" class="rounded-lg py-2 text-xs font-bold ${!up ? "bg-white text-thot-forest shadow-sm" : "text-gray-500"}">J'ai déjà un code</button><button type="button" onclick="setTab('signup')" class="rounded-lg py-2 text-xs font-bold ${up ? "bg-white text-thot-forest shadow-sm" : "text-gray-500"}">Première visite</button></div><h2 class="font-serif text-xl font-bold">${up ? "Créer mon code à 4 chiffres" : "Accéder à mes points"}</h2><form onsubmit="submitAuth(event)" class="mt-4 space-y-3">${up ? `<input id="login-name" type="text" required placeholder="Nom et prénom" class="w-full rounded-xl border p-3 text-sm" />` : ""}<input id="login-email" type="email" required placeholder="Votre adresse e-mail" class="w-full rounded-xl border p-3 text-sm" /><div class="flex justify-between items-center"><span class="text-xs text-gray-500">Code à 4 chiffres</span><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div><input id="login-secret" type="${state.showSecret ? "text" : "password"}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="••••" class="w-full rounded-xl border p-3 text-center font-mono text-lg tracking-widest" /><button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">${up ? "Créer mon code" : "Me connecter"}</button></form></div><div class="mt-6 text-center"><button type="button" onclick="setTab('staff')" class="text-xs text-gray-400 underline">🔒 Accès Caisse (Libraire)</button></div>`;
+      appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"><div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-100 p-1 mb-5"><button type="button" onclick="setTab('login')" class="rounded-lg py-2 text-xs font-bold ${!up ? "bg-white text-thot-forest shadow-sm" : "text-gray-500"}">J'ai déjà un code</button><button type="button" onclick="setTab('signup')" class="rounded-lg py-2 text-xs font-bold ${up ? "bg-white text-thot-forest shadow-sm" : "text-gray-500"}">Première visite</button></div><h2 class="font-serif text-xl font-bold">${up ? "Créer mon code à 4 chiffres" : "Accéder à mes points"}</h2><form onsubmit="submitAuth(event)" class="mt-4 space-y-3">${up ? `<input id="login-name" type="text" required placeholder="Nom et prénom" class="w-full rounded-xl border p-3 text-sm" />` : ""}<input id="login-email" type="email" required placeholder="Votre adresse e-mail" class="w-full rounded-xl border p-3 text-sm" /><div class="flex justify-between items-center"><span class="text-xs text-gray-500">Code à 4 chiffres</span><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div><input id="login-secret" type="${state.showSecret ? "text" : "password"}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="••••" class="w-full rounded-xl border p-3 text-center font-mono text-lg tracking-widest" /><button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">${up ? "Créer mon code" : "Me connecter"}</button></form>${rgpdHtml}</div><div class="mt-6 text-center"><button type="button" onclick="setTab('staff')" class="text-xs text-gray-400 underline">🔒 Accès Caisse (Libraire)</button></div>`;
     }
     async function render() {
       if (!state.customer) return renderLogin();
@@ -58,6 +65,10 @@
       if (state.authTab === "staff" && data.role !== "staff") { await sb.auth.signOut(); state.customer = null; state.err = "Accès refusé : ce compte n'est pas libraire."; return render(); }
       state.customer = data; render();
     }
+    window.installApp = async () => {
+      if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; }
+      alert("Pour installer l'application :\n\n• Sur Android (Chrome) : appuyez sur les 3 points ⋮ en haut à droite puis « Ajouter à l'écran d'accueil ».\n\n• Sur iPhone (Safari) : appuyez sur le bouton Partager en bas puis « Sur l'écran d'accueil ».");
+    };
     window.setTab = (t) => { state.authTab = t; state.showSecret = false; state.err = null; state.msg = null; render(); };
     window.toggleShow = () => { const s = document.getElementById("login-secret")?.value || "", e = document.getElementById("login-email")?.value || "", n = document.getElementById("login-name")?.value || ""; state.showSecret = !state.showSecret; render(); if (document.getElementById("login-email")) document.getElementById("login-email").value = e; if (document.getElementById("login-secret")) document.getElementById("login-secret").value = s; if (document.getElementById("login-name")) document.getElementById("login-name").value = n; };
     window.submitAuth = async (e) => {
