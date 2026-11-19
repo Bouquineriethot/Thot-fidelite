@@ -1,8 +1,11 @@
 window.renderStaff = async () => {
   state.vouchers = [];
+  let isVip = false;
   if (state.selected) {
-    const { data: v } = await sb.from("vouchers").select("*").eq("customer_id", state.selected.id).eq("status", "active");
-    state.vouchers = v || [];
+    const { data: allV } = await sb.from("vouchers").select("*").eq("customer_id", state.selected.id);
+    const listV = allV || [];
+    state.vouchers = listV.filter((v) => v.status === "active");
+    isVip = listV.some((v) => v.status !== "cancelled" && v.points_cost === 999);
   }
   appEl.innerHTML = headerHtml() + flashHtml() + `<div class="space-y-5">
     <div class="flex flex-wrap gap-2">
@@ -20,9 +23,12 @@ window.renderStaff = async () => {
     </form>
     ${state.selected ? `<div class="space-y-4 rounded-2xl border-2 border-thot-forest bg-white p-5 shadow-md">
       <div class="flex justify-between items-start">
-        <div><h3 class="font-serif text-xl font-bold">${esc(state.selected.full_name)}</h3>
-          <p class="text-xs text-gray-500">${esc(state.selected.email || state.selected.phone || state.selected.card_code)}</p>
-          <p class="mt-2 text-2xl font-extrabold text-thot-forest">${state.selected.points} points</p></div>
+        <div>
+          <h3 class="font-serif text-xl font-bold">${esc(state.selected.full_name)}</h3>
+          ${isVip ? `<span class="mt-1 inline-block rounded-full bg-amber-300 px-2.5 py-0.5 text-xs font-bold text-thot-ink">👑 VIP -10 % à vie (livres)</span>` : ""}
+          <p class="text-xs text-gray-500 mt-1">${esc(state.selected.email || state.selected.phone || state.selected.card_code)}</p>
+          <p class="mt-2 text-2xl font-extrabold text-thot-forest">${state.selected.points} points</p>
+        </div>
         <button onclick="clearSelected()" class="text-sm text-gray-400 px-2">✕</button>
       </div>
       ${state.vouchers.length ? `<div class="space-y-2 rounded-xl bg-amber-50 p-3">
@@ -31,11 +37,16 @@ window.renderStaff = async () => {
           <span class="text-sm font-semibold">${esc(v.reward_title)} (${esc(v.code)})</span>
           <button onclick="useVoucher('${v.id}')" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white">Valider</button>
         </div>`).join("")}</div>` : ""}
-      <form onsubmit="addPoints(event)" class="flex flex-wrap gap-2">
-        <input id="pts-euros" type="text" inputmode="decimal" required placeholder="Montant € (1€=1pt)" class="w-40 rounded-lg border p-2 text-sm" />
-        <input id="pts-reason" type="text" value="Achat boutique" class="flex-1 min-w-[130px] rounded-lg border p-2 text-sm" />
-        <button class="rounded-lg bg-thot-forest px-4 py-2 text-sm font-bold text-white">Créditer</button>
-      </form>
+      <div class="space-y-2">
+        <div class="flex flex-wrap gap-2">
+          <input id="pts-euros" type="text" inputmode="decimal" placeholder="Montant € ou pts" class="w-40 rounded-lg border p-2 text-sm" />
+          <input id="pts-reason" type="text" value="Achat boutique" class="flex-1 min-w-[130px] rounded-lg border p-2 text-sm" />
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="adjustPoints(1)" class="flex-1 rounded-lg bg-thot-forest px-4 py-2 text-sm font-bold text-white">+ Créditer</button>
+          <button type="button" onclick="adjustPoints(-1)" class="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-bold text-red-700">− Retirer</button>
+        </div>
+      </div>
     </div>` : ""}
     <div class="space-y-2">
       <input id="search-input" placeholder="Chercher nom, e-mail, tél ou code..." value="${esc(state.searchQuery)}" oninput="onSearch(this.value)" class="w-full rounded-xl border border-stone-200 bg-white p-2.5 text-sm" />
@@ -67,12 +78,18 @@ window.createClient = async (e) => {
   if (error) state.err = frError(error.message); else { state.selected = data; state.msg = "Client créé !"; }
   render();
 };
-window.addPoints = async (e) => {
-  e.preventDefault();
-  const pts = Math.floor(parseFloat(document.getElementById("pts-euros").value.replace(",", ".")));
-  if (isNaN(pts) || pts === 0) return;
-  const { data: total, error } = await sb.rpc("staff_add_points", { p_customer_id: state.selected.id, p_points: pts, p_reason: document.getElementById("pts-reason").value });
-  if (error) state.err = frError(error.message); else { state.selected.points = total; state.msg = `${pts > 0 ? "+" : ""}${pts} pts enregistrés !`; }
+window.adjustPoints = async (sign) => {
+  const val = document.getElementById("pts-euros").value.replace(",", ".");
+  const pts = Math.floor(parseFloat(val));
+  if (isNaN(pts) || pts <= 0) return;
+  let reason = document.getElementById("pts-reason").value;
+  if (sign < 0) {
+    if (!confirm(`Retirer ${pts} points à ${state.selected.full_name} ?`)) return;
+    if (reason === "Achat boutique") reason = "Retrait / Correction";
+  }
+  const { data: total, error } = await sb.rpc("staff_add_points", { p_customer_id: state.selected.id, p_points: sign * pts, p_reason: reason });
+  if (error) state.err = frError(error.message);
+  else { state.selected.points = total; state.msg = `${sign > 0 ? "+" : "-"}${pts} pts enregistrés !`; }
   render();
 };
 window.useVoucher = async (id) => {
