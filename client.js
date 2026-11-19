@@ -1,36 +1,81 @@
 window.renderCustomer = async () => {
   const c = state.customer;
-  const [{ data: rewards }, { data: vouchers }, { data: txs }] = await Promise.all([
+  const [{ data: rewards }, { data: allVouchers }, { data: txs }] = await Promise.all([
     sb.from("rewards").select("*").eq("active", true).order("points_cost"),
-    sb.from("vouchers").select("*").eq("customer_id", c.id).eq("status", "active").order("created_at", { ascending: false }),
+    sb.from("vouchers").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }),
     sb.from("transactions").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }).limit(15)
   ]);
+
   state.rewards = rewards || [];
-  const next = state.rewards.find((r) => r.points_cost > c.points);
-  const pct = next ? Math.min(100, (c.points / next.points_cost) * 100) : 100;
+  const vouchers = allVouchers || [];
+  const activeVouchers = vouchers.filter((v) => v.status === "active");
+  const usedIds = new Set(vouchers.filter((v) => v.status !== "cancelled").map((v) => v.reward_id));
+
+  const now = new Date();
+  const usedThisMonth = vouchers.some((v) => {
+    if (v.status === "cancelled") return false;
+    const d = new Date(v.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+
+  const unlockedCount = state.rewards.filter((r) => usedIds.has(r.id)).length;
+  const annee = state.rewards[0]?.year || now.getFullYear();
 
   appEl.innerHTML = headerHtml() + flashHtml() + `<div class="space-y-6">
     <div class="rounded-2xl bg-thot-forest p-6 text-white shadow-lg">
       <div class="flex items-start justify-between gap-4">
-        <div><p class="text-xs uppercase tracking-widest text-emerald-200">Bouquinerie Thot</p>
+        <div>
+          <p class="text-xs uppercase tracking-widest text-emerald-200">Bouquinerie Thot</p>
           <h2 class="mt-1 font-serif text-xl font-bold">${esc(c.full_name)}</h2>
           <p class="mt-3 text-4xl font-extrabold text-amber-300">${c.points} <span class="text-base font-normal text-white">pts</span></p>
-          <p class="mt-1 text-xs text-emerald-100">1 € dépensé = 1 point</p></div>
+          <p class="mt-1 text-xs text-emerald-100">1 € dépensé = 1 point</p>
+        </div>
         <div class="rounded-xl bg-white p-2 text-center">${qrSvg(c.card_code, 84)}<p class="mt-1 font-mono text-[10px] font-bold text-thot-ink">${esc(c.card_code)}</p></div>
       </div>
-      ${next ? `<div class="mt-5"><div class="flex justify-between text-xs text-emerald-100"><span>Prochain : ${esc(next.title)}</span><span>${c.points} / ${next.points_cost} pts</span></div>
-        <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-emerald-900"><div class="h-full bg-amber-400" style="width:${pct}%"></div></div></div>` : ""}
+      <div class="mt-4 flex items-center justify-between rounded-xl bg-emerald-900/60 px-3 py-2 text-xs text-emerald-100">
+        <span>🏆 Collection ${annee}</span>
+        <span class="font-bold text-amber-300">${unlockedCount} / ${state.rewards.length} cases débloquées</span>
+      </div>
     </div>
-    ${vouchers && vouchers.length ? `<section class="space-y-2"><h3 class="font-serif text-lg font-bold">Mes bons en caisse</h3>
-      ${vouchers.map((v) => `<div class="flex items-center justify-between rounded-xl border-2 border-dashed border-thot-gold bg-white p-4">
+
+    ${activeVouchers.length ? `<section class="space-y-2"><h3 class="font-serif text-lg font-bold">Mon bon à présenter en caisse</h3>
+      ${activeVouchers.map((v) => `<div class="flex items-center justify-between rounded-xl border-2 border-dashed border-thot-gold bg-white p-4">
         <div><p class="font-bold text-thot-forest">${esc(v.reward_title)}</p><p class="font-mono text-xs text-gray-500">${esc(v.code)}</p></div>${qrSvg(v.code, 64)}
       </div>`).join("")}</section>` : ""}
-    <section class="space-y-2"><h3 class="font-serif text-lg font-bold">Échanger mes points</h3>
-      ${state.rewards.map((r) => { const ok = c.points >= r.points_cost; return `<div class="flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-4">
-        <div><p class="font-bold">${esc(r.title)}</p><p class="text-xs text-gray-500">${esc(r.description || "")}</p><p class="mt-1 text-xs font-semibold text-thot-forest">${r.points_cost} points</p></div>
-        <button ${ok ? `onclick="redeemReward('${r.id}')"` : "disabled"} class="shrink-0 rounded-lg px-4 py-2 text-xs font-bold ${ok ? "bg-thot-forest text-white" : "bg-stone-100 text-stone-400"}">${ok ? "Échanger" : "Insuffisant"}</button>
-      </div>`; }).join("")}
+
+    <section class="space-y-3">
+      <div>
+        <h3 class="font-serif text-lg font-bold">Choisir une offre (${annee})</h3>
+        <p class="text-xs text-gray-500">1 offre maximum par mois • Chaque case ne sert qu'une fois dans l'année.</p>
+      </div>
+      ${usedThisMonth ? `<div class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-medium text-amber-900">
+        ⏳ Vous avez déjà choisi votre offre pour ce mois-ci ! Prochain choix disponible dès le 1er du mois prochain.
+      </div>` : ""}
+      <div class="grid grid-cols-2 gap-3">
+        ${state.rewards.map((r) => {
+          const already = usedIds.has(r.id);
+          const enough = c.points >= r.points_cost;
+          const canPick = !already && !usedThisMonth && enough;
+          return `<div class="flex flex-col justify-between rounded-2xl border p-3.5 shadow-sm ${already ? "border-emerald-300 bg-emerald-50/70" : canPick ? "border-thot-forest bg-white" : "border-stone-200 bg-white/75"}">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-2xl">${esc(r.icon || "🎁")}</span>
+                <span class="rounded-full px-2 py-0.5 text-[11px] font-bold ${already ? "bg-emerald-200 text-emerald-900" : "bg-stone-100 text-thot-forest"}">${r.points_cost} pts</span>
+              </div>
+              <p class="mt-2 font-serif text-sm font-bold leading-snug">${esc(r.title)}</p>
+              <p class="mt-1 text-[11px] text-gray-500 leading-snug">${esc(r.description || "")}</p>
+            </div>
+            <div class="mt-3">
+              ${already ? `<div class="w-full rounded-lg bg-emerald-200/70 py-1.5 text-center text-[11px] font-bold text-emerald-900">✅ Obtenue</div>`
+              : usedThisMonth ? `<div class="w-full rounded-lg bg-stone-100 py-1.5 text-center text-[11px] font-medium text-stone-400">Revenez le mois prochain</div>`
+              : enough ? `<button onclick="redeemReward('${r.id}')" class="w-full rounded-lg bg-thot-forest py-2 text-xs font-bold text-white">Choisir</button>`
+              : `<div class="w-full rounded-lg bg-stone-100 py-1.5 text-center text-[11px] font-medium text-stone-400">Encore ${r.points_cost - c.points} pts</div>`}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
     </section>
+
     <section class="space-y-2"><h3 class="font-serif text-lg font-bold">Historique</h3>
       <div class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white">
         ${!txs || !txs.length ? `<p class="p-4 text-sm text-gray-500">Aucun mouvement.</p>` : txs.map((t) => `<div class="flex items-center justify-between px-4 py-3 text-sm">
@@ -44,10 +89,10 @@ window.renderCustomer = async () => {
 
 window.redeemReward = async (id) => {
   const r = state.rewards.find((x) => x.id === id);
-  if (!r || !confirm(`Échanger ${r.points_cost} pts contre "${r.title}" ?`)) return;
+  if (!r || !confirm(`Choisir « ${r.title} » pour ${r.points_cost} pts ?\n(1 seule offre par mois, non réutilisable cette année.)`)) return;
   state.msg = null; state.err = null;
   const { error } = await sb.rpc("redeem_reward", { p_reward_id: id });
   if (error) state.err = frError(error.message);
-  else state.msg = `Bon "${r.title}" généré ! Présentez-le en caisse.`;
+  else state.msg = `Offre « ${r.title} » débloquée ! Présentez le bon en caisse.`;
   await loadProfile();
 };
