@@ -10,13 +10,17 @@ window.renderCustomer = async () => {
   const vouchers = allVouchers || [];
   const activeVouchers = vouchers.filter((v) => v.status === "active");
   const usedIds = new Set(vouchers.filter((v) => v.status !== "cancelled").map((v) => v.reward_id));
-  const isVip = vouchers.some((v) => v.status !== "cancelled" && v.points_cost === 999);
+  const isVip = !!c.vip_lifetime;
 
   const now = new Date();
   const usedThisMonth = vouchers.some((v) => {
-    if (v.status === "cancelled") return false;
+    if (v.status === "cancelled" || (v.code || "").startsWith("ANNIV-")) return false;
     const d = new Date(v.created_at);
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+  const usedBirthday = vouchers.some((v) => {
+    if (v.status === "cancelled" || !(v.code || "").startsWith("ANNIV-")) return false;
+    return new Date(v.created_at).getFullYear() === now.getFullYear();
   });
 
   const unlockedCount = state.rewards.filter((r) => usedIds.has(r.id)).length;
@@ -33,9 +37,9 @@ window.renderCustomer = async () => {
         <div>
           <p class="text-xs uppercase tracking-widest text-emerald-200">Bouquinerie Thot</p>
           <h2 class="mt-1 font-serif text-xl font-bold">${esc(c.full_name)}</h2>
-          ${isVip ? `<span class="mt-1 inline-block rounded-full bg-amber-400 px-2.5 py-0.5 text-[11px] font-bold text-thot-ink">👑 VIP -10 % à vie (livres)</span>` : ""}
+          ${isVip ? `<span class="mt-1 inline-block rounded-full bg-amber-400 px-2.5 py-0.5 text-[11px] font-bold text-thot-ink">👑 -10 % à vie actif</span>` : ""}
           <p class="mt-3 text-4xl font-extrabold text-amber-300">${c.points} <span class="text-base font-normal text-white">pts</span></p>
-          <p class="mt-1 text-xs text-emerald-100">1 € dépensé = 1 point</p>
+          <p class="mt-1 text-xs text-emerald-100">1 € dépensé = 5 points</p>
         </div>
         <div class="rounded-xl bg-white p-2 text-center">${qrSvg(c.card_code, 84)}<p class="mt-1 font-mono text-[10px] font-bold text-thot-ink">${esc(c.card_code)}</p></div>
       </div>
@@ -45,10 +49,32 @@ window.renderCustomer = async () => {
       </div>
     </div>
 
+    ${isVip ? `<div class="rounded-2xl border-2 border-thot-gold bg-amber-50 p-4 shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">👑</span>
+        <p class="font-serif text-base font-bold text-amber-950">Vos récompenses actives : -10 % à vie</p>
+      </div>
+      <p class="mt-2 text-xs leading-relaxed text-amber-900">
+        Valable uniquement sur les <strong>livres en boutique</strong> : hors promotions et autres offres fidélité, hors jeux de société et salon de thé, hors événements (déstockage, vente au kilo, au sac...), hors box et calendriers.
+      </p>
+    </div>` : ""}
+
     ${activeVouchers.length ? `<section class="space-y-2"><h3 class="font-serif text-lg font-bold">Mon bon à présenter en caisse</h3>
-      ${activeVouchers.map((v) => `<div class="flex items-center justify-between rounded-xl border-2 border-dashed border-thot-gold bg-white p-4">
-        <div><p class="font-bold text-thot-forest">${esc(v.reward_title)}</p><p class="font-mono text-xs text-gray-500">${esc(v.code)}</p></div>${qrSvg(v.code, 64)}
+      ${activeVouchers.map((v) => `<div class="flex items-center justify-between gap-3 rounded-xl border-2 border-dashed border-thot-gold bg-white p-4">
+        <div>
+          <p class="font-bold text-thot-forest">${esc(v.reward_title)}</p>
+          <p class="font-mono text-xs text-gray-500">${esc(v.code)} • ${new Date(v.created_at).toLocaleDateString("fr-FR")}</p>
+        </div>${qrSvg(v.code, 64)}
       </div>`).join("")}</section>` : ""}
+
+    <div class="flex items-center justify-between gap-3 rounded-2xl border-2 border-pink-200 bg-pink-50/70 p-4 shadow-sm">
+      <div>
+        <p class="font-serif text-sm font-bold text-pink-950">🎂 C'est mon anniversaire !</p>
+        <p class="text-[11px] text-pink-900/80">Formule Goûter Malin offerte le jour exact de votre anniversaire (sur présentation d'une pièce d'identité).</p>
+      </div>
+      ${usedBirthday ? `<span class="shrink-0 rounded-lg bg-pink-200 px-3 py-1.5 text-[11px] font-bold text-pink-900">✅ Utilisée</span>`
+      : `<button onclick="claimBirthday()" class="shrink-0 rounded-xl bg-pink-700 px-3.5 py-2 text-xs font-bold text-white">Activer</button>`}
+    </div>
 
     <section class="space-y-3">
       <div>
@@ -63,17 +89,17 @@ window.renderCustomer = async () => {
           const already = usedIds.has(r.id);
           const enough = c.points >= r.points_cost;
           const canPick = !already && !usedThisMonth && enough;
-          const isExclu = r.points_cost === 999;
-          return `<div class="aspect-square flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 shadow-sm ${already ? "border-emerald-300 bg-emerald-50/70" : isExclu ? "border-2 border-thot-gold bg-amber-50/50" : canPick ? "border-thot-forest bg-white" : "border-stone-200 bg-white/80"}">
+          const isExclu = r.points_cost >= 4995 || (r.title || "").includes("à vie");
+          return `<div class="min-h-[175px] flex flex-col justify-between rounded-2xl border p-2.5 shadow-sm ${already ? "border-emerald-300 bg-emerald-50/70" : isExclu ? "border-2 border-thot-gold bg-amber-50/50" : canPick ? "border-thot-forest bg-white" : "border-stone-200 bg-white/80"}">
             <div>
               <div class="flex items-center justify-between">
                 <span class="text-xl">${esc(r.icon || "🎁")}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] font-bold ${isExclu ? "bg-amber-200 text-amber-950" : already ? "bg-emerald-200 text-emerald-900" : "bg-stone-100 text-thot-forest"}">${r.points_cost} pts</span>
               </div>
               <p class="mt-1.5 font-serif text-xs font-bold leading-tight">${esc(r.title)}</p>
-              <p class="mt-1 text-[10px] text-gray-500 leading-tight line-clamp-3">${esc(r.description || "")}</p>
+              <p class="mt-1 text-[10px] text-gray-500 leading-tight">${esc(r.description || "")}</p>
             </div>
-            <div>
+            <div class="mt-2">
               ${already ? `<div class="w-full rounded-lg bg-emerald-200/70 py-1.5 text-center text-[10px] font-bold text-emerald-900">✅ Obtenue</div>`
               : usedThisMonth ? `<div class="w-full rounded-lg bg-stone-100 py-1.5 text-center text-[10px] text-stone-400">Mois prochain</div>`
               : enough ? `<button onclick="redeemReward('${r.id}')" class="w-full rounded-lg ${isExclu ? "bg-thot-gold" : "bg-thot-forest"} py-1.5 text-[11px] font-bold text-white">Choisir</button>`
@@ -102,5 +128,14 @@ window.redeemReward = async (id) => {
   const { error } = await sb.rpc("redeem_reward", { p_reward_id: id });
   if (error) state.err = frError(error.message);
   else state.msg = `Offre « ${r.title} » débloquée ! Présentez le bon en caisse.`;
+  await loadProfile();
+};
+
+window.claimBirthday = async () => {
+  if (!confirm("Attention : ce bon anniversaire est valable UNIQUEMENT le jour exact de votre anniversaire, sur présentation d'une pièce d'identité en caisse.\n\nActiver aujourd'hui ?")) return;
+  state.msg = null; state.err = null;
+  const { error } = await sb.rpc("claim_birthday_gift");
+  if (error) state.err = frError(error.message);
+  else state.msg = "🎂 Bon anniversaire activé ! Présentez-le en caisse avec votre pièce d'identité.";
   await loadProfile();
 };
