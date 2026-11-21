@@ -135,8 +135,8 @@
     window.closeInstallPopup = (forever) => { if (forever) localStorage.setItem("thot_no_install_popup", "1"); document.getElementById("install-modal").innerHTML = ""; };
     window.installFromPopup = async () => {
       if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; window.closeInstallPopup(false); return; }
-      const box = document.getElementById("popup-install-help");
-      if (box) box.classList.add("ring-2", "ring-[#C84B31]");
+      const box = document.getElementById("android-fallback");
+      if (box) box.classList.remove("hidden");
     };
     function showInstallPopup(force = false) {
       const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
@@ -145,14 +145,20 @@
       document.getElementById("install-modal").innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div class="w-full max-w-sm rounded-2xl border-2 border-[#C84B31] bg-white p-5 shadow-2xl space-y-3.5">
           <div class="flex items-center gap-3"><img src="./logo.png" alt="T" class="h-12 w-12 rounded-xl object-cover border bg-thot-forest shrink-0" />
-            <div><h3 class="font-serif text-lg font-bold leading-tight text-[#C84B31]">Votre carte en 1 clic !</h3><p class="text-xs text-gray-500">Bouquinerie Thot • Bollezeele</p></div></div>
+            <div><h3 class="font-serif text-lg font-bold leading-tight text-[#C84B31]">Votre compte fidélité en 1 clic !</h3><p class="text-xs text-gray-500">Bouquinerie Thot • Bollezeele</p></div></div>
           <div class="space-y-2 rounded-xl bg-stone-50 p-3 text-sm leading-snug text-thot-ink">
             <p>🏠 <strong>Consultez vos points tranquillement depuis chez vous</strong> à tout moment.</p>
-            <p>⚡ <strong>Facilitez votre connexion</strong> en gardant la carte directement sur votre écran d'accueil.</p>
+            <p>⚡ <strong>Facilitez votre connexion</strong> en gardant votre compte fidélité directement sur votre écran d'accueil.</p>
           </div>
-          ${isIos ? `<div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 space-y-1.5"><p class="font-bold text-sm">Sur iPhone (2 gestes) :</p><p>1️⃣ Appuyez sur <strong>Partager</strong> (carré avec flèche ⬆️ en bas).</p><p>2️⃣ Appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p></div>`
-          : `<button onclick="installFromPopup()" class="w-full rounded-xl bg-[#C84B31] hover:bg-[#b03e26] py-3.5 text-sm font-bold text-white shadow-md">📲 Mettre sur mon écran d'accueil</button>
-          <div id="popup-install-help" class="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] leading-snug text-amber-950"><strong>Comment faire si besoin :</strong> appuyez sur les <strong>3 points ⋮</strong> en haut à droite, puis <strong>« Installer et créer un raccourci »</strong>.</div>`}
+          ${!isIos ? `<button onclick="installFromPopup()" class="w-full rounded-xl bg-[#C84B31] hover:bg-[#b03e26] py-3.5 text-sm font-bold text-white shadow-md">📲 Mettre sur mon écran d'accueil</button>
+          <p id="android-fallback" class="hidden text-[11px] font-medium text-[#C84B31] text-center">Appuyez sur les 3 points ⋮ en haut à droite de Chrome, puis « Installer et créer un raccourci ».</p>` : ""}
+          <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-snug text-amber-950 space-y-1">
+            <p class="font-bold text-xs">🍎 Si vous avez un iPhone :</p>
+            <p>1️⃣ Ouvrez cette page dans <strong>Safari</strong> (l'icône boussole bleue).</p>
+            <p>2️⃣ Appuyez sur <strong>Partager</strong> (le carré avec une flèche vers le haut ⬆️ en bas de l'écran, ou sur <strong>•••</strong> puis <strong>Partager</strong>).</p>
+            <p>3️⃣ Faites défiler vers le bas et appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p>
+            <p>4️⃣ Appuyez sur <strong>« Ajouter »</strong> en haut à droite : votre compte fidélité est sur votre écran d'accueil !</p>
+          </div>
           <div class="flex items-center justify-between pt-1 text-xs">
             <button onclick="closeInstallPopup(true)" class="text-gray-400 underline">Ne plus me le rappeler</button>
             <button onclick="closeInstallPopup(false)" class="rounded-lg bg-stone-100 px-3 py-1.5 font-semibold text-gray-600">Plus tard</button>
