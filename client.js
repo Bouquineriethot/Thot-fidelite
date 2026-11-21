@@ -1,5 +1,15 @@
+window.setClientTab = (t) => {
+  state.clientTab = t;
+  state.msg = null;
+  state.err = null;
+  render();
+};
+
 window.renderCustomer = async () => {
   const c = state.customer;
+  state.clientTab = state.clientTab || "profil";
+  const tab = state.clientTab;
+
   const [{ data: rewards }, { data: allVouchers }, { data: txs }] = await Promise.all([
     sb.from("rewards").select("*").eq("active", true).order("sort_order"),
     sb.from("vouchers").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }),
@@ -27,7 +37,18 @@ window.renderCustomer = async () => {
   const annee = state.rewards[0]?.year || 2027;
   const estInstalle = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
 
-  appEl.innerHTML = headerHtml() + flashHtml() + `<div class="space-y-6">
+  const activeVouchersHtml = activeVouchers.length ? `
+    <section class="space-y-2">
+      <h3 class="font-serif text-lg font-bold">Mon bon à présenter en caisse</h3>
+      ${activeVouchers.map((v) => `<div class="flex items-center justify-between gap-3 rounded-xl border-2 border-dashed border-thot-gold bg-white p-4">
+        <div>
+          <p class="font-bold text-thot-forest">${esc(v.reward_title)}</p>
+          <p class="font-mono text-xs text-gray-500">${esc(v.code)} • ${new Date(v.created_at).toLocaleDateString("fr-FR")}</p>
+        </div>${qrSvg(v.code, 64)}
+      </div>`).join("")}
+    </section>` : "";
+
+  const profilHtml = `
     ${!estInstalle ? `<button onclick="installApp()" class="w-full rounded-xl border border-thot-gold bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900 shadow-sm">
       📲 Installer l'application sur mon écran d'accueil
     </button>` : ""}
@@ -59,13 +80,20 @@ window.renderCustomer = async () => {
       </p>
     </div>` : ""}
 
-    ${activeVouchers.length ? `<section class="space-y-2"><h3 class="font-serif text-lg font-bold">Mon bon à présenter en caisse</h3>
-      ${activeVouchers.map((v) => `<div class="flex items-center justify-between gap-3 rounded-xl border-2 border-dashed border-thot-gold bg-white p-4">
-        <div>
-          <p class="font-bold text-thot-forest">${esc(v.reward_title)}</p>
-          <p class="font-mono text-xs text-gray-500">${esc(v.code)} • ${new Date(v.created_at).toLocaleDateString("fr-FR")}</p>
-        </div>${qrSvg(v.code, 64)}
-      </div>`).join("")}</section>` : ""}
+    ${activeVouchersHtml}
+
+    <section class="space-y-2"><h3 class="font-serif text-lg font-bold">Historique</h3>
+      <div class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white">
+        ${!txs || !txs.length ? `<p class="p-4 text-sm text-gray-500">Aucun mouvement.</p>` : txs.map((t) => `<div class="flex items-center justify-between px-4 py-3 text-sm">
+          <div><p class="font-medium">${esc(t.reason)}</p><p class="text-xs text-gray-400">${new Date(t.created_at).toLocaleDateString("fr-FR")}</p></div>
+          <span class="font-bold ${t.points_delta >= 0 ? "text-emerald-700" : "text-amber-700"}">${t.points_delta >= 0 ? "+" + t.points_delta : t.points_delta} pts</span>
+        </div>`).join("")}
+      </div>
+    </section>
+  `;
+
+  const offresHtml = `
+    ${activeVouchersHtml}
 
     <div class="flex items-center justify-between gap-3 rounded-2xl border-2 border-pink-200 bg-pink-50/70 p-4 shadow-sm">
       <div>
@@ -113,16 +141,30 @@ window.renderCustomer = async () => {
         }).join("")}
       </div>
     </section>
+  `;
 
-    <section class="space-y-2"><h3 class="font-serif text-lg font-bold">Historique</h3>
-      <div class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white">
-        ${!txs || !txs.length ? `<p class="p-4 text-sm text-gray-500">Aucun mouvement.</p>` : txs.map((t) => `<div class="flex items-center justify-between px-4 py-3 text-sm">
-          <div><p class="font-medium">${esc(t.reason)}</p><p class="text-xs text-gray-400">${new Date(t.created_at).toLocaleDateString("fr-FR")}</p></div>
-          <span class="font-bold ${t.points_delta >= 0 ? "text-emerald-700" : "text-amber-700"}">${t.points_delta >= 0 ? "+" + t.points_delta : t.points_delta} pts</span>
-        </div>`).join("")}
+  appEl.innerHTML = headerHtml() + `
+    <div class="space-y-4">
+      <div class="flex items-center justify-between rounded-2xl bg-thot-forest px-4 py-3 text-white shadow">
+        <div>
+          <p class="text-[11px] text-emerald-200">Vos points • 1 € = 5 pts</p>
+          <p class="text-2xl font-extrabold text-amber-300 leading-tight">${c.points} <span class="text-sm font-normal text-white">pts</span></p>
+        </div>
+        ${isVip ? `<span class="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-thot-ink">👑 -10 % à vie</span>` : `<span class="text-xs font-medium text-emerald-100">${esc(c.full_name)}</span>`}
       </div>
-    </section>
-  </div>`;
+
+      <div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-200/70 p-1">
+        <button onclick="setClientTab('profil')" class="rounded-lg py-2 text-xs font-bold ${tab === "profil" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
+          🪪 Mon Profil
+        </button>
+        <button onclick="setClientTab('offres')" class="rounded-lg py-2 text-xs font-bold ${tab === "offres" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
+          🎁 Offres${activeVouchers.length ? ` <span class="ml-1 inline-block rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] text-white">${activeVouchers.length}</span>` : ""}
+        </button>
+      </div>
+
+      ${flashHtml()}
+      <div class="space-y-6">${tab === "profil" ? profilHtml : offresHtml}</div>
+    </div>`;
 };
 
 window.redeemReward = async (id) => {
