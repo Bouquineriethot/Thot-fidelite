@@ -41,7 +41,7 @@ window.renderStaff = async () => {
         ${state.vouchers.map((v) => `<div class="flex items-center justify-between gap-2">
           <div>
             <span class="text-sm font-semibold">${esc(v.reward_title)}</span>
-            <p class="font-mono text-[11px] text-gray-600">${esc(v.code)} • ${new Date(v.created_at).toLocaleDateString("fr-FR")}${v.points_cost ? ` • ${v.points_cost} pts` : ""}</p>
+            <p class="font-mono text-[11px] text-gray-600">${esc(v.code)} • ${new Date(v.created_at).toLocaleDateString("fr-FR")}${v.points_cost ? " • " + v.points_cost + " pts" : ""}</p>
           </div>
           <div class="flex shrink-0 gap-1.5">
             <button onclick="useVoucher('${v.id}')" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white">Valider</button>
