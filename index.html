@@ -70,7 +70,7 @@
             <p class="text-xs text-gray-500 flex items-center gap-1 mt-0.5">${fbIcon}<span>Facebook : Thot Livres d'occasion</span></p>
           </div>
         </div>
-        ${c ? `<div class="flex shrink-0 items-center gap-1.5">${c.role === "staff" ? `<button onclick="toggleMode()" class="flex items-center rounded-lg border border-thot-forest px-2 py-1 text-xs font-bold text-thot-forest">${state.staffMode ? "Vue Client" : "Vue Caisse"}${bulle}</button>` : ""}<button onclick="logout()" class="rounded-lg border border-stone-300 px-2 py-1 text-xs text-gray-600">Quitter</button></div>` : ""}
+        ${c ? `<div class="flex shrink-0 flex-col items-end gap-1">${c.role === "staff" ? `<button onclick="toggleMode()" class="flex items-center rounded-lg border border-thot-forest px-2.5 py-1 text-xs font-bold text-thot-forest">${state.staffMode ? "Vue Client" : "Vue Caisse"}${bulle}</button>` : ""}<button onclick="logout()" class="rounded-lg border border-stone-300 px-2.5 py-1 text-xs text-gray-600">Déconnexion</button></div>` : ""}
       </header>`;
     };
     const flashHtml = () => (state.msg ? `<div class="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">${esc(state.msg)}</div>` : "") + (state.err ? `<div class="mb-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">${esc(state.err)}</div>` : "");
