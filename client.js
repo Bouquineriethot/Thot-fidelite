@@ -70,7 +70,7 @@ window.renderCustomer = async () => {
     <div class="flex items-center justify-between gap-3 rounded-2xl border-2 border-pink-200 bg-pink-50/70 p-4 shadow-sm">
       <div>
         <p class="font-serif text-sm font-bold text-pink-950">🎂 C'est mon anniversaire !</p>
-        <p class="text-[11px] text-pink-900/80">Formule Goûter Malin offerte le jour exact de votre anniversaire (sur présentation d'une pièce d'identité).</p>
+        <p class="text-[11px] text-pink-900/80">Formule Goûter Malin offerte le jour exact de votre anniversaire (sur présentation d'une pièce d'identité au nom du compte).</p>
       </div>
       ${usedBirthday ? `<span class="shrink-0 rounded-lg bg-pink-200 px-3 py-1.5 text-[11px] font-bold text-pink-900">✅ Utilisée</span>`
       : `<button onclick="claimBirthday()" class="shrink-0 rounded-xl bg-pink-700 px-3.5 py-2 text-xs font-bold text-white">Activer</button>`}
@@ -136,10 +136,10 @@ window.redeemReward = async (id) => {
 };
 
 window.claimBirthday = async () => {
-  if (!confirm("Attention : ce bon anniversaire est valable UNIQUEMENT le jour exact de votre anniversaire, sur présentation d'une pièce d'identité en caisse.\n\nActiver aujourd'hui ?")) return;
+  if (!confirm("Attention : ce bon anniversaire est valable UNIQUEMENT le jour exact de votre anniversaire, sur présentation d'une pièce d'identité au nom du compte en caisse.\n\nActiver aujourd'hui ?")) return;
   state.msg = null; state.err = null;
   const { error } = await sb.rpc("claim_birthday_gift");
   if (error) state.err = frError(error.message);
-  else state.msg = "🎂 Bon anniversaire activé ! Présentez-le en caisse avec votre pièce d'identité.";
+  else state.msg = "🎂 Bon anniversaire activé ! Présentez-le en caisse avec votre pièce d'identité au nom du compte.";
   await loadProfile();
 };
