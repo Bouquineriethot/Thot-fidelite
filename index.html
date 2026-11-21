@@ -30,9 +30,7 @@
     };
     window.onerror = (m) => showErr(m);
     window.onunhandledrejection = (e) => showErr(e.reason?.message || e.reason || "Erreur inconnue");
-    setTimeout(() => {
-      if (!loadedOnce) showErr("Le chargement met trop de temps (mémoire bloquée ou connexion lente).");
-    }, 6000);
+    setTimeout(() => { if (!loadedOnce) showErr("Le chargement met trop de temps (mémoire bloquée ou connexion lente)."); }, 6000);
 
     if (!window.supabase) { showErr("Impossible de joindre le serveur. Vérifiez votre réseau."); throw new Error("Réseau"); }
     const sb = window.supabase.createClient("https://obokcfdxraixkzekgjum.supabase.co", "sb_publishable_hN4pQyzif0bM0jjIw0HGZg_OjOeTb8l", {
@@ -50,8 +48,8 @@
     function frError(m) {
       if (!m) return "Une erreur est survenue.";
       const s = m.toLowerCase();
-      if (s.includes("invalid login credentials")) return "E-mail ou code secret incorrect.";
-      if (s.includes("already registered")) return "Ce compte possède déjà un code. Connectez-vous directement.";
+      if (s.includes("invalid login credentials")) return "E-mail ou mot de passe incorrect.";
+      if (s.includes("already registered")) return "Cet e-mail est protégé par un mot de passe (Accès Caisse) ou un ancien code de test.";
       if (s.includes("database error saving new user") || s.includes("caisse")) return "Aucun compte trouvé pour cet e-mail. Demandez votre inscription à la caisse en boutique.";
       if (s.includes("email not confirmed")) return "Désactivez la confirmation par e-mail dans la base de données.";
       return m;
@@ -67,25 +65,19 @@
 
     function renderLogin() {
       loadedOnce = true;
-      const t = state.authTab;
-      if (t === "staff") {
+      if (state.authTab === "staff") {
         appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border-2 border-thot-forest bg-white p-6 shadow-sm"><h2 class="font-serif text-xl font-bold text-thot-forest">🔒 Accès Caisse (Libraire)</h2><p class="mt-1 text-xs text-gray-500">Espace réservé à la Bouquinerie Thot.</p><form onsubmit="submitAuth(event)" class="mt-4 space-y-3"><input id="login-email" type="email" required placeholder="E-mail libraire" class="w-full rounded-xl border p-3 text-sm" /><div class="flex justify-end"><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div><input id="login-secret" type="${state.showSecret ? "text" : "password"}" required placeholder="Mot de passe sécurisé" class="w-full rounded-xl border p-3 text-sm" /><button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">Ouvrir la caisse</button></form><button type="button" onclick="setTab('login')" class="mt-4 w-full text-center text-xs text-gray-500 underline">← Retour client</button></div>`;
         return;
       }
-      const isAct = t === "activate";
       appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-        <h2 class="font-serif text-xl font-bold">${isAct ? "Activer mon code à 4 chiffres" : "Connexion fidélité"}</h2>
-        <p class="mt-1 text-xs text-gray-500">${isAct ? "Uniquement si la caisse a déjà enregistré votre e-mail en boutique." : "Entrez votre e-mail et votre code à 4 chiffres."}</p>
+        <h2 class="font-serif text-xl font-bold">Connexion fidélité</h2>
+        <p class="mt-1 text-xs text-gray-500">Entrez l'adresse e-mail enregistrée lors de votre inscription en boutique.</p>
         <form onsubmit="submitAuth(event)" class="mt-4 space-y-3">
           <input id="login-email" type="email" required placeholder="Votre adresse e-mail" class="w-full rounded-xl border p-3 text-sm" />
-          <div class="flex justify-between items-center"><span class="text-xs text-gray-500">${isAct ? "Choisissez 4 chiffres" : "Code à 4 chiffres"}</span><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div>
-          <input id="login-secret" type="${state.showSecret ? "text" : "password"}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="••••" class="w-full rounded-xl border p-3 text-center font-mono text-lg tracking-widest" />
-          <button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">${isAct ? "Enregistrer mon code" : "Me connecter"}</button>
+          <button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">Accéder à mes points</button>
         </form>
-        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1.5">
-          <p><strong>Pas encore de compte ?</strong> Demandez la création de votre compte à la caisse lors de votre visite en boutique !</p>
-          ${isAct ? `<button type="button" onclick="setTab('login')" class="font-bold text-thot-forest underline">← J'ai déjà mon code</button>`
-          : `<button type="button" onclick="setTab('activate')" class="font-bold text-thot-forest underline">Compte créé en caisse sans code ? Définir mon code à 4 chiffres</button>`}
+        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+          <strong>Pas encore de compte ?</strong> Demandez la création de votre compte (nom, prénom et e-mail) à la caisse lors de votre visite en boutique !
         </div>
         ${rgpdHtml}
       </div>
@@ -157,12 +149,18 @@
     window.toggleShow = () => { const s = document.getElementById("login-secret")?.value || "", e = document.getElementById("login-email")?.value || ""; state.showSecret = !state.showSecret; render(); if (document.getElementById("login-email")) document.getElementById("login-email").value = e; if (document.getElementById("login-secret")) document.getElementById("login-secret").value = s; };
     window.submitAuth = async (e) => {
       e.preventDefault(); state.err = null; state.msg = null;
-      const email = document.getElementById("login-email").value.trim().toLowerCase(), sec = document.getElementById("login-secret").value;
-      if (state.authTab === "staff") { const { error } = await sb.auth.signInWithPassword({ email, password: sec }); if (error) { state.err = frError(error.message); return render(); } return await loadProfile(); }
-      const pin = sec.trim(); if (!/^\d{4}$/.test(pin)) { state.err = "Le code client doit faire exactement 4 chiffres."; return render(); }
-      const pwd = "THOT-PIN-" + pin;
-      if (state.authTab === "activate") { const { error } = await sb.auth.signUp({ email, password: pwd }); if (error) { state.err = frError(error.message); return render(); } }
-      else { const { error } = await sb.auth.signInWithPassword({ email, password: pwd }); if (error) { state.err = frError(error.message); return render(); } }
+      const email = document.getElementById("login-email").value.trim().toLowerCase();
+      if (state.authTab === "staff") {
+        const sec = document.getElementById("login-secret").value;
+        const { error } = await sb.auth.signInWithPassword({ email, password: sec });
+        if (error) { state.err = frError(error.message); return render(); }
+        return await loadProfile();
+      }
+      const cleClient = "THOT-CLIENT-2027-ACCES";
+      const { error: errIn } = await sb.auth.signInWithPassword({ email, password: cleClient });
+      if (!errIn) return await loadProfile();
+      const { error: errUp } = await sb.auth.signUp({ email, password: cleClient });
+      if (errUp) { state.err = frError(errUp.message); return render(); }
       await loadProfile();
     };
     window.logout = async () => { await sb.auth.signOut(); state.customer = null; state.selected = null; render(); };
