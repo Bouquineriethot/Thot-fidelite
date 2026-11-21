@@ -156,4 +156,58 @@ window.renderCustomer = async () => {
         <span class="text-xl">👑</span>
         <p class="font-serif text-base font-bold text-amber-950">Vos récompenses actives : -10 % à vie</p>
       </div>
-      <p class="mt-2 tex
+      <p class="mt-2 text-xs leading-relaxed text-amber-900">
+        Valable uniquement sur les <strong>livres en boutique</strong> : hors promotions et autres offres fidélité, hors jeux de société et salon de thé, hors événements (déstockage, vente au kilo, au sac...), hors box et calendriers.
+      </p>
+    </div>` : ""}
+
+    ${birthdayBlockHtml}
+    ${regularVouchersHtml}
+  `;
+
+  appEl.innerHTML = headerHtml() + `
+    <div class="space-y-4">
+      ${testBarHtml}
+      <div class="flex items-center justify-between rounded-2xl bg-thot-forest px-4 py-3 text-white shadow">
+        <div>
+          <p class="text-[11px] text-emerald-200">Vos points • 1 € = 5 pts</p>
+          <p class="text-2xl font-extrabold text-amber-300 leading-tight">${c.points} <span class="text-sm font-normal text-white">pts</span></p>
+        </div>
+        ${isVip ? `<span class="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-thot-ink">👑 -10 % à vie</span>` : `<span class="text-xs font-medium text-emerald-100">${esc(c.full_name)}</span>`}
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-200/70 p-1">
+        <button onclick="setClientTab('offres')" class="rounded-lg py-2 text-xs font-bold ${tab === "offres" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
+          🎁 Offres${activeVouchers.length ? ` <span class="ml-1 inline-block rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] text-white">${activeVouchers.length}</span>` : ""}
+        </button>
+        <button onclick="setClientTab('profil')" class="rounded-lg py-2 text-xs font-bold ${tab === "profil" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
+          👤 Mon Profil
+        </button>
+      </div>
+
+      ${flashHtml()}
+      <div class="space-y-5">${tab === "offres" ? offresHtml : profilHtml}</div>
+    </div>`;
+};
+
+window.redeemReward = async (id) => {
+  const r = state.rewards.find((x) => x.id === id);
+  if (!r || !confirm(`Choisir « ${r.title} » pour ${r.points_cost} pts ?`)) return;
+  state.msg = null; state.err = null;
+  const { error } = await sb.rpc("redeem_reward", {
+    p_reward_id: id,
+    p_test_month: state.testMonth || null
+  });
+  if (error) state.err = frError(error.message);
+  else state.msg = `Offre « ${r.title} » débloquée ! Présentez le bon en caisse.`;
+  await loadProfile();
+};
+
+window.claimBirthday = async () => {
+  if (!confirm("Attention : ce bon anniversaire est valable UNIQUEMENT le jour exact de votre anniversaire, sur présentation d'une pièce d'identité au nom du compte en caisse.\n\nActiver aujourd'hui ?")) return;
+  state.msg = null; state.err = null;
+  const { error } = await sb.rpc("claim_birthday_gift");
+  if (error) state.err = frError(error.message);
+  else state.msg = "🎂 Votre bon anniversaire est prêt !";
+  await loadProfile();
+};
