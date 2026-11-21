@@ -16,6 +16,7 @@
 </head>
 <body class="bg-thot-cream text-thot-ink antialiased min-h-screen">
   <div id="app" class="mx-auto max-w-xl px-4 pb-12 pt-6"><p class="text-center text-sm text-gray-500 mt-10">Chargement...</p></div>
+  <div id="install-modal"></div>
   <script>
     const sb = window.supabase.createClient("https://obokcfdxraixkzekgjum.supabase.co", "sb_publishable_hN4pQyzif0bM0jjIw0HGZg_OjOeTb8l", { auth: { persistSession: true } });
     const appEl = document.getElementById("app");
@@ -30,11 +31,13 @@
     function frError(m) {
       if (!m) return "Une erreur est survenue.";
       const s = m.toLowerCase();
-      if (s.includes("invalid login credentials")) return "E-mail ou identifiant incorrect.";
-      if (s.includes("already registered")) return "Cet e-mail possède déjà un code. Cliquez sur « J'ai déjà un code ».";
+      if (s.includes("invalid login credentials")) return "E-mail ou code secret incorrect.";
+      if (s.includes("already registered")) return "Ce compte possède déjà un code. Connectez-vous directement.";
+      if (s.includes("database error saving new user") || s.includes("caisse")) return "Aucun compte trouvé pour cet e-mail. Veuillez demander la création de votre compte à la caisse en boutique.";
       if (s.includes("email not confirmed")) return "Désactivez « Confirm email » dans Supabase.";
       return m;
     }
+
     const headerHtml = () => {
       const c = state.customer;
       const bulle = c?.role === "staff" && state.activeCount > 0 ? `<span class="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">${state.activeCount}</span>` : "";
@@ -49,9 +52,26 @@
         appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border-2 border-thot-forest bg-white p-6 shadow-sm"><h2 class="font-serif text-xl font-bold text-thot-forest">🔒 Accès Caisse (Libraire)</h2><p class="mt-1 text-xs text-gray-500">Espace réservé à la Bouquinerie Thot.</p><form onsubmit="submitAuth(event)" class="mt-4 space-y-3"><input id="login-email" type="email" required placeholder="E-mail libraire" class="w-full rounded-xl border p-3 text-sm" /><div class="flex justify-end"><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div><input id="login-secret" type="${state.showSecret ? "text" : "password"}" required placeholder="Mot de passe sécurisé" class="w-full rounded-xl border p-3 text-sm" /><button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">Ouvrir la caisse</button></form><button type="button" onclick="setTab('login')" class="mt-4 w-full text-center text-xs text-gray-500 underline">← Retour client</button></div>`;
         return;
       }
-      const up = t === "signup";
-      appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"><div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-100 p-1 mb-5"><button type="button" onclick="setTab('login')" class="rounded-lg py-2 text-xs font-bold ${!up ? "bg-white text-thot-forest shadow-sm" : "text-gray-500"}">J'ai déjà un code</button><button type="button" onclick="setTab('signup')" class="rounded-lg py-2 text-xs font-bold ${up ? "bg-white text-thot-forest shadow-sm" : "text-gray-500"}">Première visite</button></div><h2 class="font-serif text-xl font-bold">${up ? "Créer mon code à 4 chiffres" : "Accéder à mes points"}</h2><form onsubmit="submitAuth(event)" class="mt-4 space-y-3">${up ? `<input id="login-name" type="text" required placeholder="Nom et prénom" class="w-full rounded-xl border p-3 text-sm" />` : ""}<input id="login-email" type="email" required placeholder="Votre adresse e-mail" class="w-full rounded-xl border p-3 text-sm" /><div class="flex justify-between items-center"><span class="text-xs text-gray-500">Code à 4 chiffres</span><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div><input id="login-secret" type="${state.showSecret ? "text" : "password"}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="••••" class="w-full rounded-xl border p-3 text-center font-mono text-lg tracking-widest" /><button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">${up ? "Créer mon code" : "Me connecter"}</button></form>${rgpdHtml}</div><div class="mt-6 text-center"><button type="button" onclick="setTab('staff')" class="text-xs text-gray-400 underline">🔒 Accès Caisse (Libraire)</button></div>`;
+      const isAct = t === "activate";
+      appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+        <h2 class="font-serif text-xl font-bold">${isAct ? "Activer mon code à 4 chiffres" : "Connexion fidélité"}</h2>
+        <p class="mt-1 text-xs text-gray-500">${isAct ? "Uniquement si la caisse a déjà enregistré votre e-mail en boutique." : "Entrez votre e-mail et votre code à 4 chiffres."}</p>
+        <form onsubmit="submitAuth(event)" class="mt-4 space-y-3">
+          <input id="login-email" type="email" required placeholder="Votre adresse e-mail" class="w-full rounded-xl border p-3 text-sm" />
+          <div class="flex justify-between items-center"><span class="text-xs text-gray-500">${isAct ? "Choisissez 4 chiffres" : "Code à 4 chiffres"}</span><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div>
+          <input id="login-secret" type="${state.showSecret ? "text" : "password"}" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="••••" class="w-full rounded-xl border p-3 text-center font-mono text-lg tracking-widest" />
+          <button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">${isAct ? "Enregistrer mon code" : "Me connecter"}</button>
+        </form>
+        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1.5">
+          <p><strong>Pas encore de compte ?</strong> Demandez la création de votre compte à la caisse lors de votre visite en boutique !</p>
+          ${isAct ? `<button type="button" onclick="setTab('login')" class="font-bold text-thot-forest underline">← J'ai déjà mon code</button>`
+          : `<button type="button" onclick="setTab('activate')" class="font-bold text-thot-forest underline">Compte créé en caisse sans code ? Définir mon code à 4 chiffres</button>`}
+        </div>
+        ${rgpdHtml}
+      </div>
+      <div class="mt-6 text-center"><button type="button" onclick="setTab('staff')" class="text-xs text-gray-400 underline">🔒 Accès Caisse (Libraire)</button></div>`;
     }
+
     async function render() {
       if (!state.customer) return renderLogin();
       if (state.customer.role === "staff" && state.staffMode) return await window.renderStaff();
@@ -66,19 +86,54 @@
       if (state.authTab === "staff" && data.role !== "staff") { await sb.auth.signOut(); state.customer = null; state.err = "Accès refusé : ce compte n'est pas libraire."; return render(); }
       state.customer = data; render();
     }
+
     window.installApp = async () => {
       if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; }
       alert("Pour installer l'application :\n\n• Sur Android (Chrome) : appuyez sur les 3 points ⋮ en haut à droite, puis « Installer et créer un raccourci » (ou « Ajouter à l'écran d'accueil »).\n\n• Sur iPhone (Safari) : appuyez sur le bouton Partager (carré avec une flèche vers le haut) en bas, puis « Sur l'écran d'accueil ».");
     };
+    window.closeInstallPopup = (forever) => {
+      if (forever) localStorage.setItem("thot_no_install_popup", "1");
+      document.getElementById("install-modal").innerHTML = "";
+    };
+    window.installFromPopup = async () => {
+      if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; window.closeInstallPopup(false); return; }
+      const box = document.getElementById("popup-install-help");
+      if (box) box.classList.remove("hidden");
+    };
+    function showInstallPopup() {
+      const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+      if (standalone || localStorage.getItem("thot_no_install_popup") === "1") return;
+      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      document.getElementById("install-modal").innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4">
+          <div class="flex items-center gap-3">
+            <img src="./logo.png" alt="T" class="h-11 w-11 rounded-xl object-cover border bg-thot-forest" />
+            <div><h3 class="font-serif text-base font-bold text-thot-forest">Ajoutez l'appli sur votre accueil</h3><p class="text-[11px] text-gray-500">Bouquinerie Thot • Bollezeele</p></div>
+          </div>
+          <p class="text-sm leading-snug text-thot-ink">Mettez l'application en page d'accueil pour <strong>ne plus devoir vous connecter à chaque ouverture</strong> et voir vos points en 1 clic !</p>
+          ${isIos ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
+            <p class="font-bold">Sur iPhone (Safari) :</p>
+            <p>1. Appuyez sur <strong>Partager</strong> (carré avec flèche ⬆️ en bas).</p>
+            <p>2. Appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p>
+          </div>` : `<button onclick="installFromPopup()" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white shadow">📲 Mettre sur mon écran d'accueil</button>
+          <div id="popup-install-help" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">Appuyez sur les <strong>3 points ⋮</strong> en haut à droite de Chrome, puis sur <strong>« Installer et créer un raccourci »</strong> (ou « Ajouter à l'écran d'accueil »).</div>`}
+          <div class="flex items-center justify-between pt-1 text-xs">
+            <button onclick="closeInstallPopup(true)" class="text-gray-400 underline">Ne plus me le rappeler</button>
+            <button onclick="closeInstallPopup(false)" class="rounded-lg bg-stone-100 px-3 py-1.5 font-semibold text-gray-600">Plus tard</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
     window.setTab = (t) => { state.authTab = t; state.showSecret = false; state.err = null; state.msg = null; render(); };
-    window.toggleShow = () => { const s = document.getElementById("login-secret")?.value || "", e = document.getElementById("login-email")?.value || "", n = document.getElementById("login-name")?.value || ""; state.showSecret = !state.showSecret; render(); if (document.getElementById("login-email")) document.getElementById("login-email").value = e; if (document.getElementById("login-secret")) document.getElementById("login-secret").value = s; if (document.getElementById("login-name")) document.getElementById("login-name").value = n; };
+    window.toggleShow = () => { const s = document.getElementById("login-secret")?.value || "", e = document.getElementById("login-email")?.value || ""; state.showSecret = !state.showSecret; render(); if (document.getElementById("login-email")) document.getElementById("login-email").value = e; if (document.getElementById("login-secret")) document.getElementById("login-secret").value = s; };
     window.submitAuth = async (e) => {
       e.preventDefault(); state.err = null; state.msg = null;
       const email = document.getElementById("login-email").value.trim().toLowerCase(), sec = document.getElementById("login-secret").value;
       if (state.authTab === "staff") { const { error } = await sb.auth.signInWithPassword({ email, password: sec }); if (error) { state.err = frError(error.message); return render(); } return await loadProfile(); }
       const pin = sec.trim(); if (!/^\d{4}$/.test(pin)) { state.err = "Le code client doit faire exactement 4 chiffres."; return render(); }
       const pwd = "THOT-PIN-" + pin;
-      if (state.authTab === "signup") { const nm = document.getElementById("login-name").value.trim(); const { error } = await sb.auth.signUp({ email, password: pwd, options: { data: { full_name: nm } } }); if (error) { state.err = frError(error.message); return render(); } }
+      if (state.authTab === "activate") { const { error } = await sb.auth.signUp({ email, password: pwd }); if (error) { state.err = frError(error.message); return render(); } }
       else { const { error } = await sb.auth.signInWithPassword({ email, password: pwd }); if (error) { state.err = frError(error.message); return render(); } }
       await loadProfile();
     };
@@ -87,6 +142,6 @@
   </script>
   <script src="./client.js"></script>
   <script src="./caisse.js"></script>
-  <script>sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") loadProfile(); }); loadProfile();</script>
+  <script>sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") loadProfile(); }); loadProfile(); setTimeout(showInstallPopup, 600);</script>
 </body>
 </html>
