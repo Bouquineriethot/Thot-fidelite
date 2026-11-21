@@ -7,13 +7,12 @@ window.setClientTab = (t) => {
 
 window.renderCustomer = async () => {
   const c = state.customer;
-  state.clientTab = state.clientTab || "profil";
+  state.clientTab = state.clientTab || "offres";
   const tab = state.clientTab;
 
-  const [{ data: rewards }, { data: allVouchers }, { data: txs }] = await Promise.all([
+  const [{ data: rewards }, { data: allVouchers }] = await Promise.all([
     sb.from("rewards").select("*").eq("active", true).order("sort_order"),
-    sb.from("vouchers").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }),
-    sb.from("transactions").select("*").eq("customer_id", c.id).order("created_at", { ascending: false }).limit(15)
+    sb.from("vouchers").select("*").eq("customer_id", c.id).order("created_at", { ascending: false })
   ]);
 
   state.rewards = rewards || [];
@@ -47,50 +46,6 @@ window.renderCustomer = async () => {
         </div>${qrSvg(v.code, 64)}
       </div>`).join("")}
     </section>` : "";
-
-  const profilHtml = `
-    ${!estInstalle ? `<button onclick="installApp()" class="w-full rounded-xl border border-thot-gold bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900 shadow-sm">
-      📲 Installer l'application sur mon écran d'accueil
-    </button>` : ""}
-
-    <div class="rounded-2xl bg-thot-forest p-6 text-white shadow-lg">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <p class="text-xs uppercase tracking-widest text-emerald-200">Bouquinerie Thot</p>
-          <h2 class="mt-1 font-serif text-xl font-bold">${esc(c.full_name)}</h2>
-          ${isVip ? `<span class="mt-1 inline-block rounded-full bg-amber-400 px-2.5 py-0.5 text-[11px] font-bold text-thot-ink">👑 -10 % à vie actif</span>` : ""}
-          <p class="mt-3 text-4xl font-extrabold text-amber-300">${c.points} <span class="text-base font-normal text-white">pts</span></p>
-          <p class="mt-1 text-xs text-emerald-100">1 € dépensé = 5 points</p>
-        </div>
-        <div class="rounded-xl bg-white p-2 text-center">${qrSvg(c.card_code, 84)}<p class="mt-1 font-mono text-[10px] font-bold text-thot-ink">${esc(c.card_code)}</p></div>
-      </div>
-      <div class="mt-4 flex items-center justify-between rounded-xl bg-emerald-900/60 px-3 py-2 text-xs text-emerald-100">
-        <span>🏆 Collection ${annee}</span>
-        <span class="font-bold text-amber-300">${unlockedCount} / ${state.rewards.length} cases</span>
-      </div>
-    </div>
-
-    ${isVip ? `<div class="rounded-2xl border-2 border-thot-gold bg-amber-50 p-4 shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="text-xl">👑</span>
-        <p class="font-serif text-base font-bold text-amber-950">Vos récompenses actives : -10 % à vie</p>
-      </div>
-      <p class="mt-2 text-xs leading-relaxed text-amber-900">
-        Valable uniquement sur les <strong>livres en boutique</strong> : hors promotions et autres offres fidélité, hors jeux de société et salon de thé, hors événements (déstockage, vente au kilo, au sac...), hors box et calendriers.
-      </p>
-    </div>` : ""}
-
-    ${activeVouchersHtml}
-
-    <section class="space-y-2"><h3 class="font-serif text-lg font-bold">Historique</h3>
-      <div class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white">
-        ${!txs || !txs.length ? `<p class="p-4 text-sm text-gray-500">Aucun mouvement.</p>` : txs.map((t) => `<div class="flex items-center justify-between px-4 py-3 text-sm">
-          <div><p class="font-medium">${esc(t.reason)}</p><p class="text-xs text-gray-400">${new Date(t.created_at).toLocaleDateString("fr-FR")}</p></div>
-          <span class="font-bold ${t.points_delta >= 0 ? "text-emerald-700" : "text-amber-700"}">${t.points_delta >= 0 ? "+" + t.points_delta : t.points_delta} pts</span>
-        </div>`).join("")}
-      </div>
-    </section>
-  `;
 
   const offresHtml = `
     ${activeVouchersHtml}
@@ -143,6 +98,41 @@ window.renderCustomer = async () => {
     </section>
   `;
 
+  const profilHtml = `
+    ${!estInstalle ? `<button onclick="installApp()" class="w-full rounded-xl border border-thot-gold bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900 shadow-sm">
+      📲 Installer l'application sur mon écran d'accueil
+    </button>` : ""}
+
+    <div class="rounded-2xl bg-thot-forest p-6 text-white shadow-lg">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-widest text-emerald-200">Bouquinerie Thot</p>
+          <h2 class="mt-1 font-serif text-xl font-bold">${esc(c.full_name)}</h2>
+          ${isVip ? `<span class="mt-1 inline-block rounded-full bg-amber-400 px-2.5 py-0.5 text-[11px] font-bold text-thot-ink">👑 -10 % à vie actif</span>` : ""}
+          <p class="mt-3 text-4xl font-extrabold text-amber-300">${c.points} <span class="text-base font-normal text-white">pts</span></p>
+          <p class="mt-1 text-xs text-emerald-100">1 € dépensé = 5 points</p>
+        </div>
+        <div class="rounded-xl bg-white p-2 text-center">${qrSvg(c.card_code, 84)}<p class="mt-1 font-mono text-[10px] font-bold text-thot-ink">${esc(c.card_code)}</p></div>
+      </div>
+      <div class="mt-4 flex items-center justify-between rounded-xl bg-emerald-900/60 px-3 py-2 text-xs text-emerald-100">
+        <span>🏆 Collection ${annee}</span>
+        <span class="font-bold text-amber-300">${unlockedCount} / ${state.rewards.length} cases</span>
+      </div>
+    </div>
+
+    ${isVip ? `<div class="rounded-2xl border-2 border-thot-gold bg-amber-50 p-4 shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">👑</span>
+        <p class="font-serif text-base font-bold text-amber-950">Vos récompenses actives : -10 % à vie</p>
+      </div>
+      <p class="mt-2 text-xs leading-relaxed text-amber-900">
+        Valable uniquement sur les <strong>livres en boutique</strong> : hors promotions et autres offres fidélité, hors jeux de société et salon de thé, hors événements (déstockage, vente au kilo, au sac...), hors box et calendriers.
+      </p>
+    </div>` : ""}
+
+    ${activeVouchersHtml}
+  `;
+
   appEl.innerHTML = headerHtml() + `
     <div class="space-y-4">
       <div class="flex items-center justify-between rounded-2xl bg-thot-forest px-4 py-3 text-white shadow">
@@ -154,16 +144,16 @@ window.renderCustomer = async () => {
       </div>
 
       <div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-200/70 p-1">
-        <button onclick="setClientTab('profil')" class="rounded-lg py-2 text-xs font-bold ${tab === "profil" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
-          🪪 Mon Profil
-        </button>
         <button onclick="setClientTab('offres')" class="rounded-lg py-2 text-xs font-bold ${tab === "offres" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
           🎁 Offres${activeVouchers.length ? ` <span class="ml-1 inline-block rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] text-white">${activeVouchers.length}</span>` : ""}
+        </button>
+        <button onclick="setClientTab('profil')" class="rounded-lg py-2 text-xs font-bold ${tab === "profil" ? "bg-white text-thot-forest shadow-sm" : "text-gray-600"}">
+          👤 Mon Profil
         </button>
       </div>
 
       ${flashHtml()}
-      <div class="space-y-6">${tab === "profil" ? profilHtml : offresHtml}</div>
+      <div class="space-y-6">${tab === "offres" ? offresHtml : profilHtml}</div>
     </div>`;
 };
 
