@@ -22,9 +22,11 @@ window.renderCustomer = async () => {
   const now = new Date();
   const moisNoms = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
   const activeMonth = canTest && state.testMonth ? state.testMonth : (now.getMonth() + 1);
+  const moisNom = moisNoms[activeMonth - 1];
+  const deMois = /^[ao]/i.test(moisNom) ? "d'" : "de ";
   const anneeDuel = state.rewards.find((r) => r.duel_month)?.year || 2027;
   const dernierJour = new Date(anneeDuel, activeMonth, 0).getDate();
-  const periodeTxt = `Valable du 1er au ${dernierJour} ${moisNoms[activeMonth - 1]}`;
+  const periodeTxt = `Valable du 1er au ${dernierJour} ${moisNom}`;
 
   const duelOffers = state.rewards.filter((r) => r.duel_month === activeMonth);
   const permOffers = state.rewards.filter((r) => r.duel_month === null);
@@ -111,7 +113,7 @@ window.renderCustomer = async () => {
     <section class="space-y-3">
       <div class="flex items-center justify-between">
         <div>
-          <h3 class="font-serif text-lg font-bold">Duel de ${moisNoms[activeMonth - 1]}</h3>
+          <h3 class="font-serif text-lg font-bold">Duel ${deMois}${moisNom}</h3>
           <p class="text-xs font-semibold text-thot-forest">${periodeTxt}</p>
         </div>
         <span class="rounded-full bg-thot-forest px-2.5 py-1 text-[10px] font-bold text-white">1 choix / mois</span>
@@ -168,12 +170,15 @@ window.renderCustomer = async () => {
   appEl.innerHTML = headerHtml() + `
     <div class="space-y-4">
       ${testBarHtml}
-      <div class="flex items-center justify-between rounded-2xl bg-thot-forest px-4 py-3 text-white shadow">
+      <div class="flex items-center justify-between gap-3 rounded-2xl bg-thot-forest px-4 py-3 text-white shadow">
         <div>
           <p class="text-[11px] text-emerald-200">Vos points • 1 € = 5 pts</p>
           <p class="text-2xl font-extrabold text-amber-300 leading-tight">${c.points} <span class="text-sm font-normal text-white">pts</span></p>
         </div>
-        ${isVip ? `<span class="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-thot-ink">👑 -10 % à vie</span>` : `<span class="text-xs font-medium text-emerald-100">${esc(c.full_name)}</span>`}
+        <div class="text-right">
+          <p class="text-xs font-semibold text-emerald-50">${esc(c.full_name)}</p>
+          ${isVip ? `<span class="mt-1 inline-block rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-bold text-thot-ink">👑 -10 % à vie</span>` : ""}
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 rounded-xl bg-stone-200/70 p-1">
@@ -194,10 +199,7 @@ window.redeemReward = async (id) => {
   const r = state.rewards.find((x) => x.id === id);
   if (!r || !confirm(`Choisir « ${r.title} » pour ${r.points_cost} pts ?`)) return;
   state.msg = null; state.err = null;
-  const { error } = await sb.rpc("redeem_reward", {
-    p_reward_id: id,
-    p_test_month: state.testMonth || null
-  });
+  const { error } = await sb.rpc("redeem_reward", { p_reward_id: id, p_test_month: state.testMonth || null });
   if (error) state.err = frError(error.message);
   else state.msg = `Offre « ${r.title} » débloquée ! Présentez le bon en caisse.`;
   await loadProfile();
