@@ -11,15 +11,34 @@
   <script>tailwind.config={theme:{extend:{colors:{thot:{cream:"#FAF6F0",forest:"#2D4F3E",gold:"#B8860B",ink:"#1F2933"}}}}};</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-thot-cream text-thot-ink antialiased min-h-screen">
   <div id="app" class="mx-auto max-w-xl px-4 pb-12 pt-6"><p class="text-center text-sm text-gray-500 mt-10">Chargement...</p></div>
   <div id="install-modal"></div>
   <script>
-    const sb = window.supabase.createClient("https://obokcfdxraixkzekgjum.supabase.co", "sb_publishable_hN4pQyzif0bM0jjIw0HGZg_OjOeTb8l", { auth: { persistSession: true } });
     const appEl = document.getElementById("app");
+    let loadedOnce = false;
+    const showErr = (txt) => {
+      loadedOnce = true;
+      appEl.innerHTML = `<div class="rounded-2xl border border-red-200 bg-white p-5 text-sm space-y-3">
+        <p class="font-bold text-red-700">Un problème bloque l'ouverture :</p>
+        <p class="text-xs text-gray-700">${String(txt)}</p>
+        <button onclick="localStorage.clear();location.reload()" class="w-full rounded-xl bg-thot-forest py-2.5 text-xs font-bold text-white">Réinitialiser et recharger</button>
+      </div>`;
+    };
+    window.onerror = (m) => showErr(m);
+    window.onunhandledrejection = (e) => showErr(e.reason?.message || e.reason || "Erreur inconnue");
+    setTimeout(() => {
+      if (!loadedOnce) showErr("Le chargement met trop de temps (mémoire bloquée ou connexion lente).");
+    }, 6000);
+
+    if (!window.supabase) { showErr("Impossible de joindre le serveur. Vérifiez votre réseau."); throw new Error("Réseau"); }
+    const sb = window.supabase.createClient("https://obokcfdxraixkzekgjum.supabase.co", "sb_publishable_hN4pQyzif0bM0jjIw0HGZg_OjOeTb8l", {
+      auth: { persistSession: true, lock: (_n, _t, fn) => fn() }
+    });
+
     let state = { customer: null, staffMode: true, authTab: "login", showSecret: false, msg: null, err: null, selected: null, searchQuery: "", qrScanner: null, scanning: false, rewards: [], vouchers: [], activeCount: 0 };
     window.deferredPrompt = null;
     window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.deferredPrompt = e; });
@@ -33,8 +52,8 @@
       const s = m.toLowerCase();
       if (s.includes("invalid login credentials")) return "E-mail ou code secret incorrect.";
       if (s.includes("already registered")) return "Ce compte possède déjà un code. Connectez-vous directement.";
-      if (s.includes("database error saving new user") || s.includes("caisse")) return "Aucun compte trouvé pour cet e-mail. Veuillez demander la création de votre compte à la caisse en boutique.";
-      if (s.includes("email not confirmed")) return "Désactivez « Confirm email » dans Supabase.";
+      if (s.includes("database error saving new user") || s.includes("caisse")) return "Aucun compte trouvé pour cet e-mail. Demandez votre inscription à la caisse en boutique.";
+      if (s.includes("email not confirmed")) return "Désactivez la confirmation par e-mail dans la base de données.";
       return m;
     }
 
@@ -47,6 +66,7 @@
     const rgpdHtml = `<p class="mt-4 rounded-xl bg-stone-50 p-3 text-[11px] leading-snug text-gray-500">Vos coordonnées servent uniquement au programme fidélité de la Bouquinerie Thot et ne sont jamais partagées. Suppression possible sur simple demande.</p>`;
 
     function renderLogin() {
+      loadedOnce = true;
       const t = state.authTab;
       if (t === "staff") {
         appEl.innerHTML = headerHtml() + flashHtml() + `<div class="rounded-2xl border-2 border-thot-forest bg-white p-6 shadow-sm"><h2 class="font-serif text-xl font-bold text-thot-forest">🔒 Accès Caisse (Libraire)</h2><p class="mt-1 text-xs text-gray-500">Espace réservé à la Bouquinerie Thot.</p><form onsubmit="submitAuth(event)" class="mt-4 space-y-3"><input id="login-email" type="email" required placeholder="E-mail libraire" class="w-full rounded-xl border p-3 text-sm" /><div class="flex justify-end"><button type="button" onclick="toggleShow()" class="text-xs text-thot-forest underline">${state.showSecret ? "Masquer" : "Afficher"}</button></div><input id="login-secret" type="${state.showSecret ? "text" : "password"}" required placeholder="Mot de passe sécurisé" class="w-full rounded-xl border p-3 text-sm" /><button type="submit" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white">Ouvrir la caisse</button></form><button type="button" onclick="setTab('login')" class="mt-4 w-full text-center text-xs text-gray-500 underline">← Retour client</button></div>`;
@@ -73,28 +93,41 @@
     }
 
     async function render() {
-      if (!state.customer) return renderLogin();
-      if (state.customer.role === "staff" && state.staffMode) return await window.renderStaff();
-      return await window.renderCustomer();
+      try {
+        if (!state.customer) return renderLogin();
+        if (state.customer.role === "staff" && state.staffMode) {
+          if (!window.renderStaff) return showErr("Le fichier caisse.js est manquant ou incomplet.");
+          await window.renderStaff();
+        } else {
+          if (!window.renderCustomer) return showErr("Le fichier client.js est manquant ou incomplet.");
+          await window.renderCustomer();
+        }
+        loadedOnce = true;
+      } catch (e) { showErr(e.message); }
     }
+
     async function loadProfile() {
-      const { data: { session }, error: se } = await sb.auth.getSession();
-      if (se) { state.err = frError(se.message); state.customer = null; return render(); }
-      if (!session?.user) { state.customer = null; return render(); }
-      const { data, error } = await sb.from("customers").select("*").eq("auth_user_id", session.user.id).maybeSingle();
-      if (error || !data) { appEl.innerHTML = headerHtml() + `<div class="p-4 bg-red-50 rounded-xl text-sm text-red-800">${esc(error?.message || "Fiche absente.")} <button onclick="logout()" class="underline ml-2">Quitter</button></div>`; return; }
-      if (state.authTab === "staff" && data.role !== "staff") { await sb.auth.signOut(); state.customer = null; state.err = "Accès refusé : ce compte n'est pas libraire."; return render(); }
-      state.customer = data; render();
+      try {
+        const { data: { session }, error: se } = await sb.auth.getSession();
+        if (se) { state.err = frError(se.message); state.customer = null; return render(); }
+        if (!session?.user) { state.customer = null; return render(); }
+        const { data, error } = await sb.from("customers").select("*").eq("auth_user_id", session.user.id).maybeSingle();
+        if (error || !data) {
+          loadedOnce = true;
+          appEl.innerHTML = headerHtml() + `<div class="p-4 bg-red-50 rounded-xl text-sm text-red-800 space-y-2"><p>${esc(error?.message || "Fiche client introuvable.")}</p><button onclick="logout()" class="underline font-bold">Se déconnecter</button></div>`;
+          return;
+        }
+        if (state.authTab === "staff" && data.role !== "staff") { await sb.auth.signOut(); state.customer = null; state.err = "Accès refusé : ce compte n'est pas libraire."; return render(); }
+        state.customer = data;
+        await render();
+      } catch (e) { showErr(e.message); }
     }
 
     window.installApp = async () => {
       if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; }
       alert("Pour installer l'application :\n\n• Sur Android (Chrome) : appuyez sur les 3 points ⋮ en haut à droite, puis « Installer et créer un raccourci » (ou « Ajouter à l'écran d'accueil »).\n\n• Sur iPhone (Safari) : appuyez sur le bouton Partager (carré avec une flèche vers le haut) en bas, puis « Sur l'écran d'accueil ».");
     };
-    window.closeInstallPopup = (forever) => {
-      if (forever) localStorage.setItem("thot_no_install_popup", "1");
-      document.getElementById("install-modal").innerHTML = "";
-    };
+    window.closeInstallPopup = (forever) => { if (forever) localStorage.setItem("thot_no_install_popup", "1"); document.getElementById("install-modal").innerHTML = ""; };
     window.installFromPopup = async () => {
       if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; window.closeInstallPopup(false); return; }
       const box = document.getElementById("popup-install-help");
@@ -106,16 +139,11 @@
       const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
       document.getElementById("install-modal").innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4">
-          <div class="flex items-center gap-3">
-            <img src="./logo.png" alt="T" class="h-11 w-11 rounded-xl object-cover border bg-thot-forest" />
-            <div><h3 class="font-serif text-base font-bold text-thot-forest">Ajoutez l'appli sur votre accueil</h3><p class="text-[11px] text-gray-500">Bouquinerie Thot • Bollezeele</p></div>
-          </div>
+          <div class="flex items-center gap-3"><img src="./logo.png" alt="T" class="h-11 w-11 rounded-xl object-cover border bg-thot-forest" />
+            <div><h3 class="font-serif text-base font-bold text-thot-forest">Ajoutez l'appli sur votre accueil</h3><p class="text-[11px] text-gray-500">Bouquinerie Thot • Bollezeele</p></div></div>
           <p class="text-sm leading-snug text-thot-ink">Mettez l'application en page d'accueil pour <strong>ne plus devoir vous connecter à chaque ouverture</strong> et voir vos points en 1 clic !</p>
-          ${isIos ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
-            <p class="font-bold">Sur iPhone (Safari) :</p>
-            <p>1. Appuyez sur <strong>Partager</strong> (carré avec flèche ⬆️ en bas).</p>
-            <p>2. Appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p>
-          </div>` : `<button onclick="installFromPopup()" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white shadow">📲 Mettre sur mon écran d'accueil</button>
+          ${isIos ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1"><p class="font-bold">Sur iPhone (Safari) :</p><p>1. Appuyez sur <strong>Partager</strong> (carré avec flèche ⬆️ en bas).</p><p>2. Appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p></div>`
+          : `<button onclick="installFromPopup()" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white shadow">📲 Mettre sur mon écran d'accueil</button>
           <div id="popup-install-help" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">Appuyez sur les <strong>3 points ⋮</strong> en haut à droite de Chrome, puis sur <strong>« Installer et créer un raccourci »</strong> (ou « Ajouter à l'écran d'accueil »).</div>`}
           <div class="flex items-center justify-between pt-1 text-xs">
             <button onclick="closeInstallPopup(true)" class="text-gray-400 underline">Ne plus me le rappeler</button>
