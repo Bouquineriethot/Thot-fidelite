@@ -132,15 +132,23 @@
       if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; }
       showInstallPopup(true);
     };
-    window.closeInstallPopup = (forever) => { if (forever) localStorage.setItem("thot_no_install_popup", "1"); document.getElementById("install-modal").innerHTML = ""; };
+    window.closeInstallPopup = () => {
+      localStorage.setItem("thot_install_skip", "4");
+      document.getElementById("install-modal").innerHTML = "";
+    };
     window.installFromPopup = async () => {
-      if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; window.closeInstallPopup(false); return; }
+      if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; window.closeInstallPopup(); return; }
       const box = document.getElementById("android-fallback");
       if (box) box.classList.remove("hidden");
     };
     function showInstallPopup(force = false) {
+      localStorage.removeItem("thot_no_install_popup");
       const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-      if (!force && (standalone || localStorage.getItem("thot_no_install_popup") === "1")) return;
+      if (!force && standalone) return;
+      if (!force) {
+        const skip = parseInt(localStorage.getItem("thot_install_skip") || "0", 10);
+        if (skip > 0) { localStorage.setItem("thot_install_skip", String(skip - 1)); return; }
+      }
       const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
       document.getElementById("install-modal").innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div class="w-full max-w-sm rounded-2xl border-2 border-[#C84B31] bg-white p-5 shadow-2xl space-y-3.5">
@@ -159,9 +167,8 @@
             <p>3️⃣ Faites défiler vers le bas et appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p>
             <p>4️⃣ Appuyez sur <strong>« Ajouter »</strong> en haut à droite : votre compte fidélité est sur votre écran d'accueil !</p>
           </div>
-          <div class="flex items-center justify-between pt-1 text-xs">
-            <button onclick="closeInstallPopup(true)" class="text-gray-400 underline">Ne plus me le rappeler</button>
-            <button onclick="closeInstallPopup(false)" class="rounded-lg bg-stone-100 px-3 py-1.5 font-semibold text-gray-600">Plus tard</button>
+          <div class="pt-1 text-center">
+            <button onclick="closeInstallPopup()" class="w-full rounded-xl bg-stone-100 py-2.5 text-xs font-semibold text-gray-600">Me le rappeler plus tard</button>
           </div>
         </div>
       </div>`;
@@ -200,7 +207,7 @@
       .then(() => {
         sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") loadProfile(); });
         loadProfile();
-        setTimeout(showInstallPopup, 600);
+        setTimeout(() => showInstallPopup(false), 600);
       })
       .catch((e) => showErr(e.message));
   </script>
