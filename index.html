@@ -165,9 +165,23 @@
     };
     window.logout = async () => { await sb.auth.signOut(); state.customer = null; state.selected = null; render(); };
     window.toggleMode = () => { state.staffMode = !state.staffMode; state.msg = null; state.err = null; render(); };
+
+    function chargerScript(url) {
+      return new Promise((ok, ko) => {
+        const s = document.createElement("script");
+        s.src = url + "?t=" + Date.now();
+        s.onload = ok;
+        s.onerror = () => ko(new Error("Impossible de charger " + url));
+        document.body.appendChild(s);
+      });
+    }
+    Promise.all([chargerScript("./client.js"), chargerScript("./caisse.js")])
+      .then(() => {
+        sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") loadProfile(); });
+        loadProfile();
+        setTimeout(showInstallPopup, 600);
+      })
+      .catch((e) => showErr(e.message));
   </script>
-  <script src="./client.js"></script>
-  <script src="./caisse.js"></script>
-  <script>sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") loadProfile(); }); loadProfile(); setTimeout(showInstallPopup, 600);</script>
 </body>
 </html>
