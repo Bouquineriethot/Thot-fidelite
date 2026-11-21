@@ -55,10 +55,23 @@
       return m;
     }
 
+    const fbIcon = `<svg class="h-3.5 w-3.5 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>`;
+
     const headerHtml = () => {
       const c = state.customer;
       const bulle = c?.role === "staff" && state.activeCount > 0 ? `<span class="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">${state.activeCount}</span>` : "";
-      return `<header class="mb-6 flex items-center justify-between"><div class="flex items-center gap-2.5"><img src="./logo.png" alt="T" class="h-10 w-10 rounded-xl object-cover border border-stone-200 bg-thot-forest text-white" /><div><h1 class="font-serif text-lg font-bold leading-tight">Bouquinerie Thot</h1><p class="text-xs text-gray-500">Fidélité • Bollezeele</p></div></div>${c ? `<div class="flex items-center gap-2">${c.role === "staff" ? `<button onclick="toggleMode()" class="flex items-center rounded-lg border border-thot-forest px-2.5 py-1 text-xs font-bold text-thot-forest">${state.staffMode ? "Vue Client" : "Vue Caisse"}${bulle}</button>` : ""}<button onclick="logout()" class="rounded-lg border border-stone-300 px-2.5 py-1 text-xs text-gray-600">Quitter</button></div>` : ""}</header>`;
+      return `<header class="mb-6 flex items-start justify-between gap-2">
+        <div class="flex items-start gap-2.5">
+          <img src="./logo.png" alt="T" class="h-11 w-11 rounded-xl object-cover border border-stone-200 bg-thot-forest text-white shrink-0" />
+          <div>
+            <h1 class="font-serif text-lg font-bold leading-tight">Bouquinerie Thot</h1>
+            <p class="text-xs text-gray-500">Fidélité • Bollezeele</p>
+            <p class="text-xs text-gray-500">4 route de Gravelines</p>
+            <p class="text-xs text-gray-500 flex items-center gap-1 mt-0.5">${fbIcon}<span>Facebook : Thot Livres d'occasion</span></p>
+          </div>
+        </div>
+        ${c ? `<div class="flex shrink-0 items-center gap-1.5">${c.role === "staff" ? `<button onclick="toggleMode()" class="flex items-center rounded-lg border border-thot-forest px-2 py-1 text-xs font-bold text-thot-forest">${state.staffMode ? "Vue Client" : "Vue Caisse"}${bulle}</button>` : ""}<button onclick="logout()" class="rounded-lg border border-stone-300 px-2 py-1 text-xs text-gray-600">Quitter</button></div>` : ""}
+      </header>`;
     };
     const flashHtml = () => (state.msg ? `<div class="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">${esc(state.msg)}</div>` : "") + (state.err ? `<div class="mb-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">${esc(state.err)}</div>` : "");
     const rgpdHtml = `<p class="mt-4 rounded-xl bg-stone-50 p-3 text-[11px] leading-snug text-gray-500">Vos coordonnées servent uniquement au programme fidélité de la Bouquinerie Thot et ne sont jamais partagées. Suppression possible sur simple demande.</p>`;
@@ -91,97 +104,4 @@
           if (!window.renderStaff) return showErr("Le fichier caisse.js est manquant ou incomplet.");
           await window.renderStaff();
         } else {
-          if (!window.renderCustomer) return showErr("Le fichier client.js est manquant ou incomplet.");
-          await window.renderCustomer();
-        }
-        loadedOnce = true;
-      } catch (e) { showErr(e.message); }
-    }
-
-    async function loadProfile() {
-      try {
-        const { data: { session }, error: se } = await sb.auth.getSession();
-        if (se) { state.err = frError(se.message); state.customer = null; return render(); }
-        if (!session?.user) { state.customer = null; return render(); }
-        const { data, error } = await sb.from("customers").select("*").eq("auth_user_id", session.user.id).maybeSingle();
-        if (error || !data) {
-          loadedOnce = true;
-          appEl.innerHTML = headerHtml() + `<div class="p-4 bg-red-50 rounded-xl text-sm text-red-800 space-y-2"><p>${esc(error?.message || "Fiche client introuvable.")}</p><button onclick="logout()" class="underline font-bold">Se déconnecter</button></div>`;
-          return;
-        }
-        if (state.authTab === "staff" && data.role !== "staff") { await sb.auth.signOut(); state.customer = null; state.err = "Accès refusé : ce compte n'est pas libraire."; return render(); }
-        state.customer = data;
-        await render();
-      } catch (e) { showErr(e.message); }
-    }
-
-    window.installApp = async () => {
-      if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; }
-      alert("Pour installer l'application :\n\n• Sur Android (Chrome) : appuyez sur les 3 points ⋮ en haut à droite, puis « Installer et créer un raccourci » (ou « Ajouter à l'écran d'accueil »).\n\n• Sur iPhone (Safari) : appuyez sur le bouton Partager (carré avec une flèche vers le haut) en bas, puis « Sur l'écran d'accueil ».");
-    };
-    window.closeInstallPopup = (forever) => { if (forever) localStorage.setItem("thot_no_install_popup", "1"); document.getElementById("install-modal").innerHTML = ""; };
-    window.installFromPopup = async () => {
-      if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; window.closeInstallPopup(false); return; }
-      const box = document.getElementById("popup-install-help");
-      if (box) box.classList.remove("hidden");
-    };
-    function showInstallPopup() {
-      const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-      if (standalone || localStorage.getItem("thot_no_install_popup") === "1") return;
-      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      document.getElementById("install-modal").innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-        <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4">
-          <div class="flex items-center gap-3"><img src="./logo.png" alt="T" class="h-11 w-11 rounded-xl object-cover border bg-thot-forest" />
-            <div><h3 class="font-serif text-base font-bold text-thot-forest">Ajoutez l'appli sur votre accueil</h3><p class="text-[11px] text-gray-500">Bouquinerie Thot • Bollezeele</p></div></div>
-          <p class="text-sm leading-snug text-thot-ink">Mettez l'application en page d'accueil pour <strong>ne plus devoir vous connecter à chaque ouverture</strong> et voir vos points en 1 clic !</p>
-          ${isIos ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1"><p class="font-bold">Sur iPhone (Safari) :</p><p>1. Appuyez sur <strong>Partager</strong> (carré avec flèche ⬆️ en bas).</p><p>2. Appuyez sur <strong>« Sur l'écran d'accueil »</strong>.</p></div>`
-          : `<button onclick="installFromPopup()" class="w-full rounded-xl bg-thot-forest py-3 text-sm font-bold text-white shadow">📲 Mettre sur mon écran d'accueil</button>
-          <div id="popup-install-help" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">Appuyez sur les <strong>3 points ⋮</strong> en haut à droite de Chrome, puis sur <strong>« Installer et créer un raccourci »</strong> (ou « Ajouter à l'écran d'accueil »).</div>`}
-          <div class="flex items-center justify-between pt-1 text-xs">
-            <button onclick="closeInstallPopup(true)" class="text-gray-400 underline">Ne plus me le rappeler</button>
-            <button onclick="closeInstallPopup(false)" class="rounded-lg bg-stone-100 px-3 py-1.5 font-semibold text-gray-600">Plus tard</button>
-          </div>
-        </div>
-      </div>`;
-    }
-
-    window.setTab = (t) => { state.authTab = t; state.showSecret = false; state.err = null; state.msg = null; render(); };
-    window.toggleShow = () => { const s = document.getElementById("login-secret")?.value || "", e = document.getElementById("login-email")?.value || ""; state.showSecret = !state.showSecret; render(); if (document.getElementById("login-email")) document.getElementById("login-email").value = e; if (document.getElementById("login-secret")) document.getElementById("login-secret").value = s; };
-    window.submitAuth = async (e) => {
-      e.preventDefault(); state.err = null; state.msg = null;
-      const email = document.getElementById("login-email").value.trim().toLowerCase();
-      if (state.authTab === "staff") {
-        const sec = document.getElementById("login-secret").value;
-        const { error } = await sb.auth.signInWithPassword({ email, password: sec });
-        if (error) { state.err = frError(error.message); return render(); }
-        return await loadProfile();
-      }
-      const cleClient = "THOT-CLIENT-2027-ACCES";
-      const { error: errIn } = await sb.auth.signInWithPassword({ email, password: cleClient });
-      if (!errIn) return await loadProfile();
-      const { error: errUp } = await sb.auth.signUp({ email, password: cleClient });
-      if (errUp) { state.err = frError(errUp.message); return render(); }
-      await loadProfile();
-    };
-    window.logout = async () => { await sb.auth.signOut(); state.customer = null; state.selected = null; render(); };
-    window.toggleMode = () => { state.staffMode = !state.staffMode; state.msg = null; state.err = null; render(); };
-
-    function chargerScript(url) {
-      return new Promise((ok, ko) => {
-        const s = document.createElement("script");
-        s.src = url + "?t=" + Date.now();
-        s.onload = ok;
-        s.onerror = () => ko(new Error("Impossible de charger " + url));
-        document.body.appendChild(s);
-      });
-    }
-    Promise.all([chargerScript("./client.js"), chargerScript("./caisse.js")])
-      .then(() => {
-        sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") loadProfile(); });
-        loadProfile();
-        setTimeout(showInstallPopup, 600);
-      })
-      .catch((e) => showErr(e.message));
-  </script>
-</body>
-</html>
+          if (!window.renderCustomer) return showErr("Le fichier client.js est
