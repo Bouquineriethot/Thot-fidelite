@@ -90,6 +90,7 @@ window.renderCustomer = async () => {
           const enough = c.points >= r.points_cost;
           const canPick = !already && !usedThisMonth && enough;
           const isExclu = r.points_cost >= 4995 || (r.title || "").includes("à vie");
+          const pct = already ? 100 : Math.min(100, Math.max(0, (c.points / r.points_cost) * 100));
           return `<div class="min-h-[175px] flex flex-col justify-between rounded-2xl border p-2.5 shadow-sm ${already ? "border-emerald-300 bg-emerald-50/70" : isExclu ? "border-2 border-thot-gold bg-amber-50/50" : canPick ? "border-thot-forest bg-white" : "border-stone-200 bg-white/80"}">
             <div>
               <div class="flex items-center justify-between">
@@ -99,11 +100,14 @@ window.renderCustomer = async () => {
               <p class="mt-1.5 font-serif text-xs font-bold leading-tight">${esc(r.title)}</p>
               <p class="mt-1 text-[10px] text-gray-500 leading-tight">${esc(r.description || "")}</p>
             </div>
-            <div class="mt-2">
+            <div class="mt-2.5 space-y-2">
+              <div class="h-2 w-full overflow-hidden rounded-full bg-stone-200">
+                <div class="h-full rounded-full transition-all ${already ? "bg-emerald-500" : isExclu ? "bg-thot-gold" : "bg-thot-forest"}" style="width:${pct}%"></div>
+              </div>
               ${already ? `<div class="w-full rounded-lg bg-emerald-200/70 py-1.5 text-center text-[10px] font-bold text-emerald-900">✅ Obtenue</div>`
               : usedThisMonth ? `<div class="w-full rounded-lg bg-stone-100 py-1.5 text-center text-[10px] text-stone-400">Mois prochain</div>`
               : enough ? `<button onclick="redeemReward('${r.id}')" class="w-full rounded-lg ${isExclu ? "bg-thot-gold" : "bg-thot-forest"} py-1.5 text-[11px] font-bold text-white">Choisir</button>`
-              : `<div class="w-full rounded-lg bg-stone-100 py-1.5 text-center text-[10px] text-stone-400">-${r.points_cost - c.points} pts</div>`}
+              : ""}
             </div>
           </div>`;
         }).join("")}
