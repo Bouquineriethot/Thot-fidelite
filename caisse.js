@@ -1,8 +1,13 @@
 window.renderStaff = async () => {
   state.vouchers = [];
+  let txs = [];
   if (state.selected) {
-    const { data: allV } = await sb.from("vouchers").select("*").eq("customer_id", state.selected.id).eq("status", "active");
+    const [{ data: allV }, { data: allT }] = await Promise.all([
+      sb.from("vouchers").select("*").eq("customer_id", state.selected.id).eq("status", "active"),
+      sb.from("transactions").select("*").eq("customer_id", state.selected.id).order("created_at", { ascending: false }).limit(20)
+    ]);
     state.vouchers = allV || [];
+    txs = allT || [];
   }
   const vip = !!state.selected?.vip_lifetime;
   appEl.innerHTML = headerHtml() + flashHtml() + `<div class="space-y-5">
@@ -62,6 +67,16 @@ window.renderStaff = async () => {
           <button type="button" onclick="adjustPoints(-1)" class="flex-1 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-bold text-red-700">− Retirer</button>
         </div>
       </div>
+      <div class="pt-2 border-t border-stone-200">
+        <p class="text-xs font-bold uppercase text-gray-500 mb-2">Historique du client</p>
+        <div class="max-h-48 overflow-y-auto divide-y divide-stone-100 rounded-xl border border-stone-200 bg-stone-50">
+          ${!txs.length ? `<p class="p-3 text-xs text-gray-500">Aucun mouvement.</p>` : txs.map((t) => `<div class="flex items-center justify-between px-3 py-2 text-xs">
+            <div><p class="font-medium">${esc(t.reason)}</p><p class="text-[10px] text-gray-400">${new Date(t.created_at).toLocaleDateString("fr-FR")}</p></div>
+            <span class="font-bold ${t.points_delta >= 0 ? "text-emerald-700" : "text-amber-700"}">${t.points_delta >= 0 ? "+" + t.points_delta : t.points_delta} pts</span>
+          </div>`).join("")}
+        </div>
+      </div>
+      ${state.selected.role !== "staff" ? `<button type="button" onclick="deleteCust()" class="w-full rounded-lg border border-red-200 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">🗑️ Supprimer cette fiche client</button>` : ""}
     </div>` : ""}
     <div class="space-y-2">
       <input id="search-input" placeholder="Chercher nom, e-mail ou code..." value="${esc(state.searchQuery)}" oninput="onSearch(this.value)" class="w-full rounded-xl border border-stone-200 bg-white p-2.5 text-sm" />
@@ -108,6 +123,7 @@ window.selectCust = async (id) => { const { data } = await sb.from("customers").
 window.clearSelected = () => { state.selected = null; render(); };
 window.toggleNewForm = () => document.getElementById("new-client-form").classList.toggle("hidden");
 window.createClient = async (e) => { e.preventDefault(); const fn = document.getElementById("nc-first").value.trim(), ln = document.getElementById("nc-last").value.trim(), em = document.getElementById("nc-email").value.trim().toLowerCase(), code = "THOT-" + Math.random().toString(36).substring(2, 8).toUpperCase(); const { data, error } = await sb.from("customers").insert({ full_name: `${fn} ${ln}`, email: em, card_code: code, points: 0 }).select().single(); if (error) state.err = frError(error.message); else { state.selected = data; state.msg = "Client créé ! Il peut maintenant se connecter avec son e-mail."; } render(); };
+window.deleteCust = async () => { if (!state.selected || !confirm(`Supprimer définitivement la fiche de ${state.selected.full_name} et tous ses points ?`)) return; const { error } = await sb.rpc("staff_delete_customer", { p_customer_id: state.selected.id }); if (error) state.err = frError(error.message); else { state.msg = `Fiche de ${state.selected.full_name} supprimée.`; state.selected = null; } render(); };
 window.adjustPoints = async (sign) => { const n = parseFloat((document.getElementById("pts-val")?.value || "").replace(",", ".")), d = document.getElementById("pts-direct")?.checked, pts = d ? Math.floor(n) : Math.floor(n * 5); if (isNaN(pts) || pts <= 0) return; let r = document.getElementById("pts-reason").value; if (sign < 0) { if (!confirm(`Retirer ${pts} points à ${state.selected.full_name} ?`)) return; if (r === "Achat boutique") r = "Retrait / Correction"; } const { data: tot, error } = await sb.rpc("staff_add_points", { p_customer_id: state.selected.id, p_points: sign * pts, p_reason: r }); if (error) state.err = frError(error.message); else { state.selected.points = tot; state.msg = `${sign > 0 ? "+" : "-"}${pts} pts enregistrés !`; } render(); };
 window.useVoucher = async (id) => { const v = state.vouchers.find((x) => x.id === id); if (!v || !confirm(`Valider "${v.reward_title}" ?`)) return; const { error } = await sb.rpc("staff_use_voucher", { p_voucher_id: id }); if (error) state.err = frError(error.message); else { state.msg = `Bon "${v.reward_title}" validé !`; if (v.points_cost >= 4995 || (v.reward_title || "").includes("à vie")) state.selected.vip_lifetime = true; } render(); };
 window.cancelVoucher = async (id) => { const v = state.vouchers.find((x) => x.id === id); if (!v || !confirm(`Annuler "${v.reward_title}" et rendre ${v.points_cost} pts ?`)) return; const { data: tot, error } = await sb.rpc("staff_cancel_voucher", { p_voucher_id: id }); if (error) state.err = frError(error.message); else { state.selected.points = tot; state.msg = v.points_cost > 0 ? `Bon annulé et ${v.points_cost} pts rendus !` : "Bon annulé !"; } render(); };
